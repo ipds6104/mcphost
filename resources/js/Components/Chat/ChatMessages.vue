@@ -387,22 +387,7 @@ onMounted(() => {
                 </div>
 
                 <!-- Tampilan Respon AI (Aliran Artikel Natural Tanpa Gelembung Chat Kaku) -->
-                <div v-else class="flex w-full max-w-4xl items-start gap-4">
-                    <!-- BPS Sparkle Avatar / Logo -->
-                    <div
-                        class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-blue-500 via-indigo-500 to-pink-500 text-white shadow-md"
-                    >
-                        <svg
-                            class="h-5 w-5"
-                            fill="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                d="M12 2L14.7 9.3L22 12L14.7 14.7L12 22L9.3 14.7L2 12L9.3 9.3L12 2Z"
-                            />
-                        </svg>
-                    </div>
-
+                <div v-else class="flex w-full max-w-4xl items-start">
                     <!-- Text & Media Flow Container -->
                     <div class="min-w-0 flex-1 space-y-4">
                         <!-- Loader Efek Aurora Sparkle (Pulsing Gradient Shimmer) -->

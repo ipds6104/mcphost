@@ -167,7 +167,7 @@ onUnmounted(() => {
                         stroke-linecap="round"
                         stroke-linejoin="round"
                         stroke-width="2"
-                        d="M4 6h16M4 12h16M4 18h16"
+                        d="M4 8h16M4 16h12"
                     />
                 </svg>
             </button>

@@ -398,7 +398,7 @@ onUnmounted(() => {
             >
                 <!-- Header Atas Transparan/Translucent -->
                 <div
-                    class="border-gray-250/20 z-10 flex h-16 shrink-0 select-none items-center justify-between border-b bg-white/40 px-6 backdrop-blur-md dark:border-gray-800/20 dark:bg-[#131314]/40"
+                    class="border-gray-250/20 z-10 flex h-16 shrink-0 select-none items-center justify-between border-b bg-gradient-to-b from-white/90 via-white/50 to-white/20 px-6 backdrop-blur-md dark:border-gray-800/20 dark:from-[#131314]/90 dark:via-[#131314]/50 dark:to-[#131314]/20"
                 >
                     <div class="flex items-center gap-3">
                         <!-- Hamburger Menu Button (visible when sidebar is closed) -->
@@ -419,7 +419,7 @@ onUnmounted(() => {
                                     stroke-linecap="round"
                                     stroke-linejoin="round"
                                     stroke-width="2"
-                                    d="M4 6h16M4 12h16M4 18h16"
+                                    d="M4 8h16M4 16h12"
                                 />
                             </svg>
                         </button>
@@ -433,11 +433,6 @@ onUnmounted(() => {
                                         : 'Percakapan Baru'
                                 }}
                             </h2>
-                            <p
-                                class="font-sans text-[9px] font-extrabold uppercase tracking-widest text-gray-400 dark:text-gray-500"
-                            >
-                                Kab. Mempawah • SPESIAL AI
-                            </p>
                         </div>
                     </div>
                 </div>
