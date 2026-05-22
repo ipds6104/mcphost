@@ -1,0 +1,143 @@
+services:
+  # Database PostgreSQL Lokal (Hanya untuk local development)
+  postgres:
+    image: postgres:16-alpine
+    container_name: mcphost-postgres
+    environment:
+      POSTGRES_DB: mcphost
+      POSTGRES_USER: mcphost
+      POSTGRES_PASSWORD: mcphost
+      TZ: Asia/Jakarta
+    ports:
+      - "54322:5432"
+    volumes:
+      - mcphost-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mcphost -d mcphost"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Cache & Queue Redis Lokal (Hanya untuk local development)
+  redis:
+    image: redis:alpine
+    container_name: mcphost-redis
+    ports:
+      - "63792:6379"
+    volumes:
+      - mcphost-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Web Server Utama (PHP-FPM & Nginx)
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dev
+    container_name: mcphost-web
+    volumes:
+      - .:/var/www/html
+    ports:
+      - "8900:8080"
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REVERB_HOST=reverb
+      - APP_URL=http://127.0.0.1:8900
+      - USER_ID=1000
+      - GROUP_ID=1000
+      - TZ=Asia/Jakarta
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    entrypoint: ["/var/www/html/docker/entrypoint.dev.sh"]
+    command: ["/init"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Vite Asset Watcher (Vue 3 / Inertia)
+  vite:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dev
+    container_name: mcphost-vite
+    volumes:
+      - .:/var/www/html
+    ports:
+      - "5173:5173"
+    environment:
+      - APP_URL=http://127.0.0.1:8900
+      - USER_ID=1000
+      - GROUP_ID=1000
+      - TZ=Asia/Jakarta
+    entrypoint: []
+    command: ["npm", "run", "dev", "--", "--host"]
+    depends_on:
+      web:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+
+  # Laravel Reverb Server (WebSockets)
+  reverb:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dev
+    container_name: mcphost-reverb
+    volumes:
+      - .:/var/www/html
+    ports:
+      - "8080:8080"
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REVERB_HOST=reverb
+      - USER_ID=1000
+      - GROUP_ID=1000
+      - TZ=Asia/Jakarta
+    command: ["php", "artisan", "reverb:start", "--host=0.0.0.0", "--port=8080"]
+    depends_on:
+      web:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+
+  # Queue Worker (Background Jobs)
+  worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dev
+    container_name: mcphost-worker
+    volumes:
+      - .:/var/www/html
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REVERB_HOST=reverb
+      - USER_ID=1000
+      - GROUP_ID=1000
+      - TZ=Asia/Jakarta
+    command: ["php", "artisan", "queue:work", "--tries=3"]
+    depends_on:
+      web:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+
+volumes:
+  mcphost-db-data:
+  mcphost-redis-data:

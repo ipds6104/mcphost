@@ -1,0 +1,21 @@
+FROM serversideup/php:8.3-fpm-nginx
+
+USER root
+
+# Install PostgreSQL client & Node.js 20
+RUN apt-get update && apt-get install -y \
+    postgresql-client \
+    curl \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Install required PHP extensions for local PostgreSQL and Redis
+RUN install-php-extensions pdo_pgsql redis
+
+WORKDIR /var/www/html
+
+# Change www-data UID and GID to match host developer (1000:1000)
+RUN docker-php-serversideup-set-id www-data 1000:1000
+
+USER root
