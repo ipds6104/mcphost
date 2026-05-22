@@ -65,20 +65,24 @@ class McpRemoteClientService
      */
     public function getTools(string $type = 'data'): array
     {
-        $url = $type === 'data' ? $this->dataServerUrl : $this->apiServerUrl;
-        $token = $this->getAccessToken($type);
+        $cacheKey = "mcp_{$type}_tools";
 
-        $response = Http::withToken($token)
-            ->withHeaders([
-                'Mcp-Session-Id' => Str::uuid()->toString(),
-            ])
-            ->get("{$url}/mcp/tools");
+        return Cache::remember($cacheKey, now()->addMinutes(15), function () use ($type) {
+            $url = $type === 'data' ? $this->dataServerUrl : $this->apiServerUrl;
+            $token = $this->getAccessToken($type);
 
-        if ($response->failed()) {
-            throw new \Exception("Failed to fetch tools from Remote MCP {$type}: " . $response->body());
-        }
+            $response = Http::withToken($token)
+                ->withHeaders([
+                    'Mcp-Session-Id' => Str::uuid()->toString(),
+                ])
+                ->get("{$url}/mcp/tools");
 
-        return $response->json('tools', []);
+            if ($response->failed()) {
+                throw new \Exception("Failed to fetch tools from Remote MCP {$type}: " . $response->body());
+            }
+
+            return $response->json('tools', []);
+        });
     }
 
     /**
