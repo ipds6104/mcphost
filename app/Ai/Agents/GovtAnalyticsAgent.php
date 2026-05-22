@@ -27,7 +27,7 @@ use Stringable;
  * Default SDK jika tidak diset: round(tool_count × 1.5) = round(4 × 1.5) = 6.
  * Kita set eksplisit ke 5 untuk kontrol yang lebih jelas dan hemat token.
  */
-#[MaxSteps(5)]
+#[MaxSteps(10)]
 class GovtAnalyticsAgent implements Agent, Conversational, HasTools
 {
     use Promptable;

@@ -53,6 +53,31 @@ onMounted(() => {
     if (window.innerWidth < 768) {
         isSidebarOpen.value = false;
     }
+
+    // Pemulihan State Latar Belakang (Transient State Auto-Recovery - Mei 2026 Best Practice)
+    // Jika pesan terakhir di chat adalah dari user, asumsikan asisten AI sedang
+    // memproses di latar belakang (misal setelah refresh halaman).
+    if (localMessages.value.length > 0) {
+        const lastMsg = localMessages.value[localMessages.value.length - 1];
+        if (lastMsg.role === 'user') {
+            isAiProcessing.value = true;
+
+            // Masukkan temp-loader jika belum ada agar loader visual berputar dan Echo mendengarkan
+            const hasLoader = localMessages.value.some(
+                (m) => m.id === 'temp-loader',
+            );
+            if (!hasLoader) {
+                localMessages.value.push({
+                    id: 'temp-loader',
+                    role: 'assistant',
+                    content: '',
+                    is_loading: true,
+                    agent_steps: [...activeAgentSteps.value],
+                    created_at: new Date().toISOString(),
+                });
+            }
+        }
+    }
 });
 const page = usePage();
 watch(
@@ -68,6 +93,8 @@ const localMessages = ref<Message[]>([...props.messages]);
 
 const isAiProcessing = ref(false);
 const activeAgentSteps = ref<AgentStep[]>([]);
+const queryStartTime = ref<number | null>(null);
+const stepStartTimes = ref<Record<number, number>>({});
 
 watch(
     () => props.messages,
@@ -139,6 +166,8 @@ const handleSend = ({
     content: string;
     images: File[];
 }) => {
+    queryStartTime.value = performance.now();
+    console.log(`🚀 [Chat] Prompt sent: "${content}"`);
     form.content = content;
     form.images = images;
 
@@ -210,11 +239,22 @@ watch(
                     name: 'AgentStepStarted',
                     callback: (event: {
                         stepIndex: number;
-                        toolName: string;
+                        stepName?: string;
+                        toolName?: string;
                     }) => {
+                        stepStartTimes.value[event.stepIndex] =
+                            performance.now();
+                        const stepName =
+                            event.stepName ||
+                            event.toolName ||
+                            'Mengakses BPS MCP Tool';
+                        console.log(
+                            `🤖 [AI Step Started] Step #${event.stepIndex}: "${stepName}"`,
+                        );
+
                         const step: AgentStep = {
                             step: event.stepIndex,
-                            tool: event.toolName,
+                            tool: stepName,
                             status: 'running',
                         };
                         activeAgentSteps.value.push(step);
@@ -234,15 +274,43 @@ watch(
                     name: 'AgentStepCompleted',
                     callback: (event: {
                         stepIndex: number;
-                        result: unknown;
+                        stepName?: string;
+                        toolName?: string;
+                        output?: unknown;
+                        result?: unknown;
                     }) => {
+                        const stepName =
+                            event.stepName ||
+                            event.toolName ||
+                            'Mengakses BPS MCP Tool';
+                        const outputData =
+                            event.output !== undefined
+                                ? event.output
+                                : event.result;
+                        let stepDurationStr = '';
+                        if (stepStartTimes.value[event.stepIndex]) {
+                            const stepDuration = (
+                                (performance.now() -
+                                    stepStartTimes.value[event.stepIndex]) /
+                                1000
+                            ).toFixed(2);
+                            stepDurationStr = ` in ${stepDuration}s`;
+                            delete stepStartTimes.value[event.stepIndex];
+                        }
+                        console.log(
+                            `✅ [AI Step Completed] Step #${event.stepIndex}: "${stepName}"${stepDurationStr}`,
+                            {
+                                output: outputData,
+                            },
+                        );
+
                         activeAgentSteps.value = activeAgentSteps.value.map(
                             (s) => {
                                 if (s.step === event.stepIndex) {
                                     return {
                                         ...s,
                                         status: 'success' as const,
-                                        result: event.result,
+                                        result: outputData,
                                     };
                                 }
                                 return s;
@@ -286,6 +354,18 @@ watch(
                             agent_steps: prevSteps,
                             created_at: new Date().toISOString(),
                         });
+
+                        // Calculate and log total duration
+                        if (queryStartTime.value !== null) {
+                            const duration = (
+                                (performance.now() - queryStartTime.value) /
+                                1000
+                            ).toFixed(2);
+                            console.log(
+                                `⏱️ [Chat] AI response fully received in ${duration}s.`,
+                            );
+                            queryStartTime.value = null;
+                        }
                     },
                 },
             ]);
@@ -311,6 +391,11 @@ const handleRegenerateMessage = (messageId: string | number) => {
     // Cari indeks pesan asisten
     const idx = localMessages.value.findIndex((m) => m.id === messageId);
     if (idx === -1) return;
+
+    queryStartTime.value = performance.now();
+    console.log(
+        `🔄 [Chat] Regenerate message requested for message ID: ${messageId}`,
+    );
 
     // Hapus pesan asisten dan tampilkan state loading
     localMessages.value.splice(idx, 1);

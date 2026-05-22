@@ -73,8 +73,9 @@ class ChatController extends Controller
                 'attachments' => count($attachments) > 0 ? $attachments : null,
             ]);
 
-            // Dispatch orkestrasi AI secara asinkron
-            ProcessAiAgentQuery::dispatch($chat->id, $userMessage->id);
+            // Dispatch orkestrasi AI secara asinkron dengan delay 1.5 detik (Mei 2026 Best Practice)
+            // untuk memberi waktu bagi frontend bergabung ke Private Channel WebSocket
+            ProcessAiAgentQuery::dispatch($chat->id, $userMessage->id)->delay(now()->addMilliseconds(1500));
 
             return redirect()->route('chats.show', $chat->id);
         }
