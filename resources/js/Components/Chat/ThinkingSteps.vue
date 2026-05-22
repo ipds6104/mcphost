@@ -16,9 +16,25 @@ const props = defineProps<{
 const isExpanded = ref(true);
 const activeStepDetail = ref<number | null>(null);
 
+// Normalisasi langkah secara reaktif agar status selalu terdefinisi
+const normalizedSteps = computed(() => {
+    return props.steps.map((step) => {
+        let status = step.status;
+        if (!status) {
+            // Jika status tidak didefinisikan (misal saat cold-load dari DB),
+            // tebak berdasarkan keberadaan hasil tool-call.
+            status = step.result ? 'success' : 'running';
+        }
+        return {
+            ...step,
+            status,
+        };
+    });
+});
+
 // Periksa apakah ada langkah yang masih berjalan
 const hasRunningStep = computed(() => {
-    return props.steps.some((s) => s.status === 'running');
+    return normalizedSteps.value.some((s) => s.status === 'running');
 });
 
 // Auto-collapse saat semua langkah selesai (seperti Perplexity)
@@ -44,7 +60,12 @@ const getFriendlyToolName = (tool: string) => {
         fetch_regional_report: 'Mengambil laporan pembangunan regional lengkap',
         get_bps_indicator: 'Membaca nilai indikator data nasional BPS',
     };
-    return mapping[tool] || `Mengeksekusi tool: ${tool}`;
+    if (mapping[tool]) return mapping[tool];
+    const formatted = tool
+        .split('_')
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+    return `Menjalankan analisis data: ${formatted}`;
 };
 
 // Helper salin teks ke papan klip dengan notifikasi visual
@@ -126,32 +147,28 @@ const copyToClipboard = (text: string, stepId: number) => {
         <!-- Timeline (Only visible when isExpanded is true) -->
         <div
             v-show="isExpanded"
-            class="border-gray-250/60 duration-350 relative ml-3 mt-3 space-y-4 border-l pl-4 transition-all ease-in-out dark:border-gray-800/60"
+            class="duration-350 relative ml-3 mt-3 space-y-4 border-l border-gray-200 pl-4 transition-all ease-in-out dark:border-gray-800"
         >
             <div
-                v-for="(step, sIdx) in steps"
+                v-for="(step, sIdx) in normalizedSteps"
                 :key="sIdx"
                 class="animate-fade-in relative"
             >
                 <!-- Timeline node dot -->
                 <div
-                    class="absolute -left-[22.5px] top-1 flex h-3 w-3 items-center justify-center rounded-full bg-white dark:bg-[#131314]"
-                >
-                    <div
-                        :class="[
-                            'rounded-full transition duration-300',
-                            step.status === 'running'
-                                ? 'h-2.5 w-2.5 animate-pulse bg-blue-500'
-                                : '',
-                            step.status === 'success'
-                                ? 'h-2 w-2 bg-green-500 dark:bg-green-400'
-                                : '',
-                            step.status === 'failed'
-                                ? 'h-2 w-2 bg-red-500'
-                                : '',
-                        ]"
-                    ></div>
-                </div>
+                    :class="[
+                        'absolute -left-[22px] top-[2px] h-2.5 w-2.5 rounded-full border-2 shadow-sm transition duration-300',
+                        step.status === 'running'
+                            ? 'bg-blue-500 border-white dark:border-[#131314] animate-pulse shadow-[0_0_6px_rgba(59,130,246,0.5)]'
+                            : '',
+                        step.status === 'success'
+                            ? 'bg-emerald-500 border-white dark:border-[#131314] shadow-[0_0_6px_rgba(16,185,129,0.4)]'
+                            : '',
+                        step.status === 'failed'
+                            ? 'bg-rose-500 border-white dark:border-[#131314] shadow-[0_0_6px_rgba(244,63,94,0.4)]'
+                            : '',
+                    ]"
+                ></div>
 
                 <!-- Content wrapper -->
                 <div class="space-y-1.5">
@@ -178,11 +195,6 @@ const copyToClipboard = (text: string, stepId: number) => {
                                 class="truncate font-medium text-gray-700 dark:text-gray-300"
                             >
                                 {{ getFriendlyToolName(step.tool) }}
-                            </span>
-                            <span
-                                class="shrink-0 rounded bg-gray-100 px-1 font-mono text-[9.5px] font-semibold text-gray-400 dark:bg-gray-800 dark:text-gray-500"
-                            >
-                                {{ step.tool }}
                             </span>
                         </div>
 

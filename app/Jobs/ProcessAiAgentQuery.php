@@ -131,6 +131,7 @@ class ProcessAiAgentQuery implements ShouldQueue
                         'Untuk pertanyaan umum, jawab langsung dengan pengetahuan Anda tanpa memanggil tools.',
                         'Selalu gunakan Bahasa Indonesia yang baik dan profesional.',
                         'Format jawaban dengan Markdown untuk keterbacaan yang optimal.',
+                        'PENTING: Jika Anda menyajikan data dalam bentuk tabel, Anda WAJIB menggunakan format tabel Markdown GFM standar dengan garis pembatas (menggunakan karakter pipe | dan tanda hubung - seperti | Indikator | Nilai |). DILARANG KERAS menyajikan tabel menggunakan spasi kosong sebagai kolom penyelarasan agar tabel dapat dirender dengan rapi di frontend.',
                     ]),
                     tools: $tools,
                     messages: $aiMessages

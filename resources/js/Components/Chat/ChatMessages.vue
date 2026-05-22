@@ -395,29 +395,58 @@ onMounted(() => {
                             v-if="message.is_loading"
                             class="w-full space-y-3 py-3"
                         >
+                            <!-- KASUS A: AI Menjawab Langsung / Sedang Berpikir (Direct Answer, agent_steps Kosong) -->
                             <div
-                                class="flex animate-pulse items-center gap-2 text-blue-500 dark:text-blue-400"
+                                v-if="!message.agent_steps || message.agent_steps.length === 0"
+                                class="space-y-3 animate-fade-in"
                             >
                                 <div
-                                    class="h-3.5 w-3.5 animate-ping rounded-full bg-gradient-to-tr from-cyan-400 via-blue-500 to-indigo-500"
-                                ></div>
-                                <span
-                                    class="animate-pulse text-[11px] font-bold tracking-wide"
-                                    >Menghubungi Agen BPS AI...</span
+                                    class="flex items-center gap-2.5 text-indigo-500 dark:text-indigo-400"
                                 >
+                                    <!-- Indigo Sparkle/Brain Pulse Dot -->
+                                    <span class="relative flex h-3 w-3 shrink-0 items-center justify-center">
+                                        <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-75"></span>
+                                        <span class="relative inline-flex h-2 w-2 rounded-full bg-indigo-500 shadow-[0_0_6px_rgba(99,102,241,0.5)]"></span>
+                                    </span>
+                                    <span
+                                        class="animate-pulse text-[11px] font-bold uppercase tracking-wider"
+                                        >Sedang merumuskan jawaban langsung...</span
+                                    >
+                                </div>
+                                <div class="space-y-2 pl-5.5">
+                                    <div
+                                        class="h-1.5 w-[85%] animate-pulse rounded-full bg-gradient-to-r from-indigo-100/60 via-purple-100/60 to-pink-100/60 dark:from-indigo-950/20 dark:via-purple-950/20 dark:to-pink-950/20"
+                                    ></div>
+                                    <div
+                                        class="h-1.5 w-[55%] animate-pulse rounded-full bg-gradient-to-r from-indigo-100/60 via-purple-100/60 to-pink-100/60 dark:from-indigo-950/20 dark:via-purple-950/20 dark:to-pink-950/20"
+                                    ></div>
+                                    <div
+                                        class="h-1.5 w-[70%] animate-pulse rounded-full bg-gradient-to-r from-indigo-100/60 via-purple-100/60 to-pink-100/60 dark:from-indigo-950/20 dark:via-purple-950/20 dark:to-pink-950/20"
+                                    ></div>
+                                </div>
                             </div>
-                            <div class="space-y-2">
+
+                            <!-- KASUS B: AI Menggunakan Tools / MCP Aktif (Tabel/Statistik Sedang Ditarik) -->
+                            <div
+                                v-else
+                                class="space-y-3 animate-fade-in"
+                            >
                                 <div
-                                    class="h-2 w-[85%] animate-pulse rounded-full bg-gradient-to-r from-blue-100 via-pink-100 to-indigo-100 dark:from-blue-900/20 dark:via-pink-900/20 dark:to-indigo-900/20"
-                                ></div>
-                                <div
-                                    class="h-2 w-[55%] animate-pulse rounded-full bg-gradient-to-r from-blue-100 via-pink-100 to-indigo-100 dark:from-blue-900/20 dark:via-pink-900/20 dark:to-indigo-900/20"
-                                ></div>
-                                <div
-                                    class="h-2 w-[70%] animate-pulse rounded-full bg-gradient-to-r from-blue-100 via-pink-100 to-indigo-100 dark:from-blue-900/20 dark:via-pink-900/20 dark:to-indigo-900/20"
-                                ></div>
+                                    class="flex items-center gap-2.5 text-emerald-500 dark:text-emerald-400"
+                                >
+                                    <!-- Emerald Analytics Pulse Dot -->
+                                    <span class="relative flex h-3 w-3 shrink-0 items-center justify-center">
+                                        <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                                        <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]"></span>
+                                    </span>
+                                    <span
+                                        class="animate-pulse text-[11px] font-bold uppercase tracking-wider"
+                                        >Sedang memproses analisis data sektoral (MCP)...</span
+                                    >
+                                </div>
                             </div>
                         </div>
+
 
                         <!-- Stepper Langkah Berpikir / Evaluasi Agen (Accordion Interaktif) -->
                         <ThinkingSteps

@@ -225,5 +225,26 @@ Setiap pengembangan lanjutan wajib mematuhi aturan ketat di bawah ini tanpa komp
         *   **Integrasi Telemetri & Friendly Names:** Menampilkan durasi eksekusi individual tool call (misal: `0.45s`) yang tersinkronisasi dari state dan memetakan nama tool teknis ke penjelasan yang ramah pengguna (user-friendly).
         *   **Auto-Collapse Pintar:** Timeline langkah berpikir akan otomatis menyusut menjadi pill pill minimalis `Completed N steps` saat pengerjaan asinkron selesai, namun tetap dapat diklik untuk diekspansi kembali.
         *   **Salin Payload Satu Klik:** Menyediakan tombol salin JSON respons dari masing-masing langkah MCP langsung di sebelah kode payload hasil.
-
+*   **23 Mei 2026:** 🎨 **Penyempurnaan Visual & Kontras Tinggi Timeline Langkah Berpikir AI (ThinkingSteps).**
+    *   *Deskripsi:* Memperbaiki visualisasi timeline dan menyelaraskan penampilannya agar menyerupai standar premium Perplexity tanpa menampilkan nama tool teknis.
+    *   *Perbaikan Utama:*
+        *   **Sembunyikan Tool Teknis:** Menghapus tag kode monospace abu-abu (`{{ step.tool }}`) sehingga hanya menampilkan deskripsi langkah ramah pengguna (user-friendly) secara bersih (misal: *"Mencari data statistik regional BPS"*).
+        *   **Perbaikan Garis Timeline:** Mengganti warna border non-standar `border-gray-250/60` dengan `border-gray-200` (Light) dan `dark:border-gray-800` (Dark) untuk kontras tinggi yang bersih.
+        *   **Alineasi Sempurna Bullet Dots:** Menggeser dot dari posisi `-left-[22.5px] top-1` menjadi `-left-[23px] top-0.5` sehingga tepat terpusat pada garis vertikal timeline dan sejajar sempurna dengan teks langkah.
+        *   **Peningkatan Kontras Bullets:** Membungkus dot dalam lingkaran solid ber-border `border border-gray-300/80 bg-white shadow-sm dark:border-gray-700/80 dark:bg-gray-900` untuk menyelimuti garis di belakangnya secara estetik di atas segala warna background (termasuk background abu-biru terang `#f0f4f9` Gemini).
+        *   **Efek Pendaran Reaktif:** Menambahkan pendaran neon halus (`shadow-glow`) pada dot reaktif: pendaran biru neon untuk langkah berjalan (`running`), hijau lembut untuk sukses (`success`), dan merah lembut untuk gagal (`failed`).
+    *   *Verifikasi:* Linter ESLint (`bun run lint`) dan kompilasi produksi Vite (`bun run build`) berhasil tuntas dengan status sukses bersih 100%.
+*   **23 Mei 2026:** 🎨 **Kustomisasi Tipografi Premium Markdown & Diferensiasi Loader UI (Direct vs MCP).**
+    *   *Deskripsi:* Mengimplementasikan kustomisasi gaya visual Markdown (.prose) di `app.css` dan merekayasa loader reaktif di `ChatMessages.vue` untuk membedakan antara respon langsung (thinking) dengan pemrosesan tool (MCP).
+    *   *Peningkatan Utama:*
+        *   **Premium Markdown Typography (.prose):** Mengatasi *preflight css reset* dari Tailwind dengan menulis aturan kustom untuk parsed Markdown:
+            *   *Tabel Modern:* Margin otomatis, `overflow-x-auto`, border horizontal tipis (`border-gray-200/50`), padding sel proporsional (`px-4 py-3`), baris zebra, header kapital tebal, serta efek transisi sorot baris (*row hover highlight*).
+            *   *Lists & Bullet Points:* Mengaktifkan kembali disc bullet untuk `ul` dan decimal number untuk `ol` lengkap dengan indentasi margin yang rapi.
+            *   *Headings & Blockquotes:* Mengatur heading `h1`-`h4` menggunakan font modern *Plus Jakarta Sans* / *Outfit* dan blockquotes elegan dengan aksen garis vertikal biru.
+        *   **Diferensiasi Loader UI Reaktif:**
+            *   *Kasus Jawaban Langsung (Thinking):* Menampilkan dot pulsing berwarna ungu-indigo (`bg-indigo-500`) dengan teks *"Sedang merumuskan jawaban langsung..."* dan shimmer lines dengan gradasi warna ungu-pink modern.
+            *   *Kasus Pemrosesan MCP/Tools:* Menampilkan dot pulsing berwarna hijau emerald (`bg-emerald-500`) dengan teks *"Sedang memproses analisis data sektoral (MCP)..."* dan menyembunyikan shimmer lines untuk digantikan oleh tampilan progresif interaktif dari `ThinkingSteps`.
+    *   *Verifikasi:*
+        *   Melakukan optimasi Laravel cache (`php artisan optimize:clear`).
+        *   Menjalankan Vite production build (`bun run build`) berhasil 100% bersih tanpa ada kesalahan tipe.
 
