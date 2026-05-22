@@ -248,3 +248,15 @@ Setiap pengembangan lanjutan wajib mematuhi aturan ketat di bawah ini tanpa komp
         *   Melakukan optimasi Laravel cache (`php artisan optimize:clear`).
         *   Menjalankan Vite production build (`bun run build`) berhasil 100% bersih tanpa ada kesalahan tipe.
 
+*   **23 Mei 2026:** ⚙️ **Resolusi Konflik Git & Sinkronisasi Repositori Berhasil (Opsi A).**
+    *   *Deskripsi:* Mengatasi kendala penggabungan Git akibat perubahan lokal yang tidak ter-commit pada mesin pengembang dengan menerapkan alur penyimpanan sementara yang aman (Git Stash).
+    *   *Langkah Penyelesaian:*
+        *   Mengamankan perubahan format otomatis/lokal pada berkas-berkas frontend (`ChatMessages.vue` dan `ThinkingSteps.vue`) ke dalam *stash storage*.
+        *   Melakukan sinkronisasi pembaruan remote (`git pull --tags origin main`) dengan status sukses dan bersih.
+        *   Menerapkan kembali (*pop*) perubahan lokal yang tersimpan ke dalam repositori kerja dengan status zero-conflict (bebas dari bentrokan kode).
+    *   *Verifikasi Pasca-Merge:*
+        *   Melakukan pembersihan berkas bootstrap Laravel (`php artisan optimize:clear`).
+        *   Menjalankan validasi linting frontend (`bun run lint`) 👉 100% PASS.
+        *   Mengeksekusi kompilasi produksi Vite (`bun run build`) 👉 Sukses dalam 1.92 detik.
+
+

@@ -159,13 +159,13 @@ const copyToClipboard = (text: string, stepId: number) => {
                     :class="[
                         'absolute -left-[22px] top-[2px] h-2.5 w-2.5 rounded-full border-2 shadow-sm transition duration-300',
                         step.status === 'running'
-                            ? 'bg-blue-500 border-white dark:border-[#131314] animate-pulse shadow-[0_0_6px_rgba(59,130,246,0.5)]'
+                            ? 'animate-pulse border-white bg-blue-500 shadow-[0_0_6px_rgba(59,130,246,0.5)] dark:border-[#131314]'
                             : '',
                         step.status === 'success'
-                            ? 'bg-emerald-500 border-white dark:border-[#131314] shadow-[0_0_6px_rgba(16,185,129,0.4)]'
+                            ? 'border-white bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.4)] dark:border-[#131314]'
                             : '',
                         step.status === 'failed'
-                            ? 'bg-rose-500 border-white dark:border-[#131314] shadow-[0_0_6px_rgba(244,63,94,0.4)]'
+                            ? 'border-white bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.4)] dark:border-[#131314]'
                             : '',
                     ]"
                 ></div>
