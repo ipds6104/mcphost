@@ -419,13 +419,6 @@ onMounted(() => {
                             </div>
                         </div>
 
-                        <!-- Isi Artikel/Dokumen Output -->
-                        <div
-                            v-if="message.content"
-                            class="prose prose-sm dark:prose-invert prose-headings:font-semibold prose-headings:text-gray-900 dark:prose-headings:text-gray-50 prose-code:rounded prose-code:bg-gray-100/80 prose-code:px-1.5 prose-code:py-0.5 dark:prose-code:bg-gray-800/80 prose-code:text-[12px] prose-code:font-mono prose-pre:rounded-xl prose-pre:bg-gray-100/80 dark:prose-pre:bg-gray-800/80 prose-a:text-blue-600 dark:prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-p:my-2 prose-blockquote:border-l-blue-500 max-w-none select-text text-[13.5px] leading-relaxed tracking-normal text-gray-900 dark:text-gray-100"
-                            v-html="renderMarkdown(message.content)"
-                        />
-
                         <!-- Stepper Langkah Berpikir / Evaluasi Agen (Accordion Interaktif) -->
                         <ThinkingSteps
                             v-if="
@@ -433,6 +426,13 @@ onMounted(() => {
                                 message.agent_steps.length > 0
                             "
                             :steps="message.agent_steps"
+                        />
+
+                        <!-- Isi Artikel/Dokumen Output -->
+                        <div
+                            v-if="message.content"
+                            class="prose prose-sm dark:prose-invert prose-headings:font-semibold prose-headings:text-gray-900 dark:prose-headings:text-gray-50 prose-code:rounded prose-code:bg-gray-100/80 prose-code:px-1.5 prose-code:py-0.5 dark:prose-code:bg-gray-800/80 prose-code:text-[12px] prose-code:font-mono prose-pre:rounded-xl prose-pre:bg-gray-100/80 dark:prose-pre:bg-gray-800/80 prose-a:text-blue-600 dark:prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-p:my-2 prose-blockquote:border-l-blue-500 max-w-none select-text text-[13.5px] leading-relaxed tracking-normal text-gray-900 dark:text-gray-100"
+                            v-html="renderMarkdown(message.content)"
                         />
 
                         <!-- Widget Diagram Grafik Interaktif (Desain Premium Floating, SVG + CSS) -->

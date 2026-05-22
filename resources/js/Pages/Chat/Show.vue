@@ -19,6 +19,7 @@ interface AgentStep {
     tool: string;
     status: 'running' | 'success' | 'failed';
     result?: unknown;
+    duration?: string;
 }
 
 interface ChartData {
@@ -288,6 +289,7 @@ watch(
                                 ? event.output
                                 : event.result;
                         let stepDurationStr = '';
+                        let stepDurationVal: string | undefined = undefined;
                         if (stepStartTimes.value[event.stepIndex]) {
                             const stepDuration = (
                                 (performance.now() -
@@ -295,6 +297,7 @@ watch(
                                 1000
                             ).toFixed(2);
                             stepDurationStr = ` in ${stepDuration}s`;
+                            stepDurationVal = `${stepDuration}s`;
                             delete stepStartTimes.value[event.stepIndex];
                         }
                         console.log(
@@ -311,6 +314,7 @@ watch(
                                         ...s,
                                         status: 'success' as const,
                                         result: outputData,
+                                        duration: stepDurationVal,
                                     };
                                 }
                                 return s;

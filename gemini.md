@@ -217,4 +217,13 @@ Setiap pengembangan lanjutan wajib mematuhi aturan ketat di bawah ini tanpa komp
         *   **Total Turnaround Latency:** Mencetak durasi penuh dari saat prompt dikirim (atau saat tombol *regenerate* ditekan) hingga respons asisten terisi lengkap (`AgentResponseGenerated`).
         *   **Step-by-Step Latency:** Mencatat waktu mulai (`AgentStepStarted`) dan durasi penyelesaian masing-masing sub-langkah/tool call (`AgentStepCompleted`) secara real-time, lengkap dengan payload output/hasil tool.
     *   *Verifikasi:* Validasi ESLint (`bun run lint`) dan build produksi Vite (`bun run build`) berhasil 100% bersih tanpa kesalahan tipe.
+*   **23 Mei 2526 / 2026:** 🎨 **Penyelarasan UI Langkah Berpikir AI ke Standar Perplexity Selesai.**
+    *   *Deskripsi:* Mengubah tampilan visual `ThinkingSteps.vue` dan memposisikannya secara presisi di atas konten utama balasan respons asisten di `ChatMessages.vue` agar menyerupai kegunaan modern dan minimalis milik aplikasi web Perplexity.
+    *   *Peningkatan Utama:*
+        *   **Reposisi Langkah Berpikir:** Langkah pengerjaan AI kini diletakkan di bagian atas pesan respons asisten (sebelum visualisasi markdown penuh) agar alur penyelesaian masalah terlihat secara alami terlebih dahulu.
+        *   **Desain Minimalis Perplexity:** Mengubah akordion tebal lama menjadi timeline teks horizontal yang bersih, menggunakan dot reaktif berwarna (biru berdenyut saat `running`, hijau solid saat `success`, merah saat `failed`).
+        *   **Integrasi Telemetri & Friendly Names:** Menampilkan durasi eksekusi individual tool call (misal: `0.45s`) yang tersinkronisasi dari state dan memetakan nama tool teknis ke penjelasan yang ramah pengguna (user-friendly).
+        *   **Auto-Collapse Pintar:** Timeline langkah berpikir akan otomatis menyusut menjadi pill pill minimalis `Completed N steps` saat pengerjaan asinkron selesai, namun tetap dapat diklik untuk diekspansi kembali.
+        *   **Salin Payload Satu Klik:** Menyediakan tombol salin JSON respons dari masing-masing langkah MCP langsung di sebelah kode payload hasil.
+
 
