@@ -1,22 +1,19 @@
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 
-const props = defineProps({
-    align: {
-        type: String,
-        default: 'right',
-    },
-    width: {
-        type: String,
-        default: '48',
-    },
-    contentClasses: {
-        type: String,
-        default: 'py-1 bg-white dark:bg-gray-700',
-    },
+interface Props {
+    align?: string;
+    width?: string | number;
+    contentClasses?: string;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+    align: 'right',
+    width: '48',
+    contentClasses: 'py-1 bg-white dark:bg-gray-700',
 });
 
-const closeOnEscape = (e) => {
+const closeOnEscape = (e: KeyboardEvent) => {
     if (open.value && e.key === 'Escape') {
         open.value = false;
     }
@@ -26,9 +23,11 @@ onMounted(() => document.addEventListener('keydown', closeOnEscape));
 onUnmounted(() => document.removeEventListener('keydown', closeOnEscape));
 
 const widthClass = computed(() => {
-    return {
-        48: 'w-48',
-    }[props.width.toString()];
+    return (
+        {
+            '48': 'w-48',
+        }[props.width.toString()] || ''
+    );
 });
 
 const alignmentClasses = computed(() => {

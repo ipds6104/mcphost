@@ -143,7 +143,7 @@ class ChatController extends Controller
         }
 
         $chat->update([
-            'is_pinned' => !$chat->is_pinned,
+            'is_pinned' => ! $chat->is_pinned,
         ]);
 
         return redirect()->back();

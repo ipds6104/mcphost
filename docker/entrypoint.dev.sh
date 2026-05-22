@@ -1,20 +1,37 @@
 #!/bin/sh
 set -e
 
+# ============================================================
+# MCPHost Dev Entrypoint
+# ============================================================
+
 # Pastikan dependencies PHP terinstal di dalam volume lokal
 if [ ! -d "vendor" ]; then
-    echo "Installing PHP dependencies..."
+    echo "[entrypoint] Installing PHP dependencies..."
     composer install --no-interaction
 fi
 
 # Pastikan dependencies NPM terinstal
 if [ ! -d "node_modules" ]; then
-    echo "Installing NPM dependencies..."
+    echo "[entrypoint] Installing NPM dependencies..."
     npm install
 fi
 
+# --- WAJIB di WSL2/Docker: Build Laravel application caches ---
+# Di WSL2, baca banyak file kecil (config/, routes/) sangat lambat (~5-10 detik/request).
+# config:cache + route:cache menggabungkan semua file menjadi SATU file → baca instan.
+# OPcache kemudian meng-compile file tunggal itu → subsequent requests ~61ms.
+#
+# Kapan perlu refresh cache setelah perubahan:
+#   - Ubah .env            → npm run docker:clear && npm run docker:optimize
+#   - Ubah config/*.php    → npm run docker:clear && npm run docker:optimize
+#   - Ubah routes/*.php    → npm run docker:clear && npm run docker:optimize
+#   - Ubah file .php lain  → TIDAK PERLU (OPcache auto-detect via VALIDATE_TIMESTAMPS=1)
+echo "[entrypoint] Building application caches (config + route + event)..."
+php artisan optimize --quiet 2>/dev/null || true
+
 # Jalankan migrasi database secara otomatis
-echo "Running database migrations..."
+echo "[entrypoint] Running database migrations..."
 php artisan migrate --force
 
 # Serahkan kontrol ke command utama

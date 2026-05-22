@@ -172,14 +172,14 @@ class ProcessAiAgentQuery implements ShouldQueue
 
         // Jika hanya sapaan sederhana, balas dengan onboarding ramah tanpa memicu simulasi tools
         if (preg_match('/^(hai|halo|helo|hello|pagi|siang|sore|malam|test|hi|ping)[\s.!]*$/i', $cleanContent)) {
-            return "Halo! 👋 Saya adalah **Asisten Agen BPS AI** untuk **Sistem Pembinaan Statistik Sektoral (SPESIAL)**.
+            return 'Halo! 👋 Saya adalah **Asisten Agen BPS AI** untuk **Sistem Pembinaan Statistik Sektoral (SPESIAL)**.
 
 Saya terhubung dengan server **BPS-MCP Active** untuk membantu Anda memantau, menganalisis, dan memvisualisasikan data statistik daerah secara sektoral.
 
 Silakan minta data analitik spesifik daerah Anda untuk memulai simulasi penarikan data secara real-time. Contoh pertanyaan:
-* *\"Tampilkan laporan kinerja statistik Kabupaten Mempawah\"*
-* *\"Bagaimana tren Indeks Pembangunan Keluarga di Mempawah?\"*
-* *\"Minta ringkasan data statistik sektoral\"*";
+* *"Tampilkan laporan kinerja statistik Kabupaten Mempawah"*
+* *"Bagaimana tren Indeks Pembangunan Keluarga di Mempawah?"*
+* *"Minta ringkasan data statistik sektoral"*';
         }
 
         // Jalankan alur simulasi tool yang kaya untuk kueri analitik / statistik
