@@ -99,6 +99,12 @@ const handleKeydown = (e: KeyboardEvent) => {
         onSubmit();
     }
 };
+
+defineExpose({
+    content,
+    textareaRef,
+    focus: () => textareaRef.value?.focus(),
+});
 </script>
 
 <template>
@@ -164,7 +170,7 @@ const handleKeydown = (e: KeyboardEvent) => {
                         title="Lampirkan Gambar"
                     >
                         <svg
-                            class="w-5.5 h-5.5"
+                            class="h-5 w-5"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -203,7 +209,7 @@ const handleKeydown = (e: KeyboardEvent) => {
                         ]"
                     >
                         <svg
-                            class="w-4.5 h-4.5 rotate-90 transform"
+                            class="h-4 w-4 rotate-90 transform"
                             fill="currentColor"
                             viewBox="0 0 20 20"
                         >

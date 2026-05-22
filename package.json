@@ -41,5 +41,11 @@
         "vite": "^8.0.0",
         "vue": "^3.4.0",
         "vue-tsc": "^3.3.1"
+    },
+    "dependencies": {
+        "@rolldown/binding-linux-x64-gnu": "^1.0.2",
+        "@types/dompurify": "^3.0.5",
+        "dompurify": "^3.4.5",
+        "marked": "^18.0.4"
     }
 }

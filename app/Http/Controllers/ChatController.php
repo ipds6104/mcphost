@@ -25,16 +25,61 @@ class ChatController extends Controller
             ->orderBy('updated_at', 'desc')
             ->get();
 
-        return Inertia::render('Dashboard', [
+        return Inertia::render('Chat/Show', [
             'chats' => $chats,
+            'currentChat' => null,
+            'messages' => [],
         ]);
     }
 
     /**
-     * Buat sesi obrolan baru
+     * Buat sesi obrolan baru (Mendukung inisialisasi Zero-Setup)
      */
     public function store(Request $request): RedirectResponse
     {
+        // Mendukung pembuatan instan dari pesan pertama
+        if ($request->has('content')) {
+            $request->validate([
+                'content' => 'required|string',
+                'images.*' => 'nullable|image|max:10240',
+            ]);
+
+            // Buat judul otomatis yang bersih dari baris pertama pesan
+            $cleanTitle = trim(strip_tags($request->content));
+            $cleanTitle = \Illuminate\Support\Str::limit($cleanTitle, 40, '...');
+            if (empty($cleanTitle)) {
+                $cleanTitle = 'Percakapan Baru';
+            }
+
+            $chat = Chat::create([
+                'user_id' => Auth::id(),
+                'title' => $cleanTitle,
+            ]);
+
+            // Proses lampiran gambar multi-gambar jika diunggah
+            $attachments = [];
+            if ($request->hasFile('images')) {
+                foreach ($request->file('images') as $image) {
+                    $path = $image->store('chats', 'public');
+                    $attachments[] = 'storage/' . $path;
+                }
+            }
+
+            // Simpan pesan awal pengguna
+            $userMessage = Message::create([
+                'chat_id' => $chat->id,
+                'role' => 'user',
+                'content' => $request->content,
+                'attachments' => count($attachments) > 0 ? $attachments : null,
+            ]);
+
+            // Dispatch orkestrasi AI secara asinkron
+            ProcessAiAgentQuery::dispatch($chat->id, $userMessage->id);
+
+            return redirect()->route('chats.show', $chat->id);
+        }
+
+        // Kemampuan pembuatan sesi manual (Fallback)
         $request->validate([
             'title' => 'required|string|max:255',
         ]);
@@ -161,5 +206,42 @@ class ChatController extends Controller
         $chat->delete();
 
         return redirect()->route('dashboard');
+    }
+
+    /**
+     * Memicu pembuatan ulang (regenerate) respons AI
+     */
+    public function regenerate(Chat $chat, Message $message): RedirectResponse
+    {
+        if ($chat->user_id !== Auth::id()) {
+            abort(403);
+        }
+
+        // Pastikan message milik chat ini dan memiliki role assistant
+        if ($message->chat_id !== $chat->id || $message->role !== 'assistant') {
+            abort(400);
+        }
+
+        // Cari pesan user terakhir sebelum pesan asisten ini
+        $userMessage = Message::where('chat_id', $chat->id)
+            ->where('id', '<', $message->id)
+            ->where('role', 'user')
+            ->orderBy('id', 'desc')
+            ->first();
+
+        if (! $userMessage) {
+            abort(400);
+        }
+
+        // Hapus pesan asisten lama
+        $message->delete();
+
+        // Sentuh timestamp chat agar diperbarui
+        $chat->touch();
+
+        // Dispatch ulang job pemrosesan AI
+        ProcessAiAgentQuery::dispatch($chat->id, $userMessage->id);
+
+        return redirect()->back();
     }
 }

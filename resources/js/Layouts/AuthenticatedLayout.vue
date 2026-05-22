@@ -7,6 +7,10 @@ import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
 import { Link } from '@inertiajs/vue3';
 import { ref } from 'vue';
 
+defineProps<{
+    hideNav?: boolean;
+}>();
+
 const showingNavigationDropdown = ref(false);
 </script>
 
@@ -14,6 +18,7 @@ const showingNavigationDropdown = ref(false);
     <div>
         <div class="min-h-screen bg-gray-100 dark:bg-gray-900">
             <nav
+                v-if="!hideNav"
                 class="border-b border-gray-100 bg-white dark:border-gray-700 dark:bg-gray-800"
             >
                 <!-- Primary Navigation Menu -->

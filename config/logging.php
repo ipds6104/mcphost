@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use Monolog\Formatter\JsonFormatter;
 use Monolog\Handler\NullHandler;
+use Monolog\Handler\RotatingFileHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
 use Monolog\Processor\PsrLogMessageProcessor;
@@ -127,6 +129,51 @@ return [
 
         'emergency' => [
             'path' => storage_path('logs/laravel.log'),
+        ],
+
+        /*
+        |----------------------------------------------------------------------
+        | Structured JSON Log Channel (Observabilitas Standar Industri)
+        |----------------------------------------------------------------------
+        | Channel ini menghasilkan log berformat JSON terstruktur yang siap
+        | dikonsumsi oleh tool agregasi log (Grafana Loki, ELK, SigNoz, dll.)
+        | Gunakan dengan LOG_CHANNEL=json di environment produksi.
+        */
+        'json' => [
+            'driver' => 'monolog',
+            'level' => env('LOG_LEVEL', 'debug'),
+            'handler' => RotatingFileHandler::class,
+            'handler_with' => [
+                'filename' => storage_path('logs/laravel-json.log'),
+                'maxFiles' => 7,
+            ],
+            'formatter' => JsonFormatter::class,
+            'processors' => [
+                PsrLogMessageProcessor::class,
+            ],
+        ],
+
+        /*
+        |----------------------------------------------------------------------
+        | AI Agent Trace Channel (Distributed Tracing untuk MCP Job)
+        |----------------------------------------------------------------------
+        | Channel khusus untuk mencatat setiap eksekusi AI agent job secara
+        | terstruktur. Setiap entry mengandung: trace_id, chat_id, user_id,
+        | provider, model, tool_count, step_count, duration_ms.
+        | Memudahkan root-cause analysis saat agent gagal atau lambat.
+        */
+        'ai_agent' => [
+            'driver' => 'monolog',
+            'level' => 'debug',
+            'handler' => RotatingFileHandler::class,
+            'handler_with' => [
+                'filename' => storage_path('logs/ai-agent.log'),
+                'maxFiles' => 14,
+            ],
+            'formatter' => JsonFormatter::class,
+            'processors' => [
+                PsrLogMessageProcessor::class,
+            ],
         ],
 
     ],

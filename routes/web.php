@@ -23,6 +23,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/chats', [ChatController::class, 'store'])->name('chats.store');
     Route::get('/chats/{chat}', [ChatController::class, 'show'])->name('chats.show');
     Route::post('/chats/{chat}/messages', [ChatController::class, 'sendMessage'])->name('chats.messages.store');
+    Route::post('/chats/{chat}/messages/{message}/regenerate', [ChatController::class, 'regenerate'])->name('chats.messages.regenerate');
     Route::patch('/chats/{chat}/rename', [ChatController::class, 'rename'])->name('chats.rename');
     Route::post('/chats/{chat}/toggle-pin', [ChatController::class, 'togglePin'])->name('chats.toggle-pin');
     Route::delete('/chats/{chat}', [ChatController::class, 'destroy'])->name('chats.destroy');

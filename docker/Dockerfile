@@ -1,10 +1,10 @@
 # === STAGE 1: Build Frontend Assets (Vue 3 / Inertia) ===
-FROM node:20-alpine AS assets-builder
+FROM oven/bun:1-alpine AS assets-builder
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
 COPY . .
-RUN npm run build
+RUN bun run build
 
 # === STAGE 2: Production PHP Runtime ===
 FROM serversideup/php:8.3-fpm-nginx AS production

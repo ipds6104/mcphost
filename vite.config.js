@@ -6,10 +6,12 @@ export default defineConfig({
     server: {
         host: '0.0.0.0',
         port: 5173,
-        // HMR: browser terhubung ke localhost:5173 dari Windows host
+        origin: 'http://127.0.0.1:5173',
+        cors: true,
+        // HMR: browser terhubung ke 127.0.0.1:5173 dari Windows host
         // (port 5173 di-expose dari container ke host)
         hmr: {
-            host: 'localhost',
+            host: '127.0.0.1',
             port: 5173,
         },
         // usePolling wajib di WSL2/Docker volume mount karena

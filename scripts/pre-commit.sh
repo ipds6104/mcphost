@@ -23,7 +23,7 @@ echo "--------------------------------------------------"
 
 # 2. Verifikasi Frontend Linting (ESLint)
 echo "🔍 Menjalankan pemeriksaan sintaks ESLint..."
-if ! npm run lint; then
+if ! bun run lint; then
     echo "❌ ERROR: Pemeriksaan ESLint gagal!"
     echo "Silakan perbaiki kesalahan ESLint/TypeScript pada frontend."
     exit 1
@@ -33,7 +33,7 @@ echo "--------------------------------------------------"
 
 # 3. Verifikasi Kompilasi Produksi (Vite production build)
 echo "🔍 Menjalankan kompilasi produksi Vite untuk verifikasi type-safety..."
-if ! npm run build; then
+if ! bun run build; then
     echo "❌ ERROR: Kompilasi produksi build Vite gagal!"
     echo "Silakan perbaiki kesalahan type-safety TypeScript dan coba komit kembali."
     exit 1

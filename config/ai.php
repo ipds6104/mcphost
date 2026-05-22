@@ -16,6 +16,7 @@ return [
     */
 
     'default' => env('AI_PROVIDER', 'openai'),
+    'default_model' => env('AI_MODEL', 'gemini-3-flash'),
     'default_for_images' => 'gemini',
     'default_for_audio' => 'openai',
     'default_for_transcription' => 'openai',
@@ -86,6 +87,7 @@ return [
         'deepseek' => [
             'driver' => 'deepseek',
             'key' => env('DEEPSEEK_API_KEY'),
+            'url' => env('DEEPSEEK_URL', 'https://api.deepseek.com/v1'),
         ],
 
         'eleven' => [
@@ -124,6 +126,7 @@ return [
             'driver' => 'openai',
             'key' => env('OPENAI_API_KEY'),
             'url' => env('OPENAI_URL', 'https://api.openai.com/v1'),
+            'model' => env('AI_MODEL', 'gemini-3-flash'),
         ],
 
         'openrouter' => [

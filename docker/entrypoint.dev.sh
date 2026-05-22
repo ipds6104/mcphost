@@ -11,10 +11,10 @@ if [ ! -d "vendor" ]; then
     composer install --no-interaction
 fi
 
-# Pastikan dependencies NPM terinstal
+# Pastikan dependencies Bun terinstal
 if [ ! -d "node_modules" ]; then
-    echo "[entrypoint] Installing NPM dependencies..."
-    npm install
+    echo "[entrypoint] Installing Bun dependencies..."
+    bun install
 fi
 
 # --- WAJIB di WSL2/Docker: Build Laravel application caches ---
@@ -23,9 +23,9 @@ fi
 # OPcache kemudian meng-compile file tunggal itu → subsequent requests ~61ms.
 #
 # Kapan perlu refresh cache setelah perubahan:
-#   - Ubah .env            → npm run docker:clear && npm run docker:optimize
-#   - Ubah config/*.php    → npm run docker:clear && npm run docker:optimize
-#   - Ubah routes/*.php    → npm run docker:clear && npm run docker:optimize
+#   - Ubah .env            → bun run docker:clear && bun run docker:optimize
+#   - Ubah config/*.php    → bun run docker:clear && bun run docker:optimize
+#   - Ubah routes/*.php    → bun run docker:clear && bun run docker:optimize
 #   - Ubah file .php lain  → TIDAK PERLU (OPcache auto-detect via VALIDATE_TIMESTAMPS=1)
 echo "[entrypoint] Building application caches (config + route + event)..."
 php artisan optimize --quiet 2>/dev/null || true

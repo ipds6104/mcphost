@@ -2,10 +2,10 @@
 import ChatInput from '@/Components/Chat/ChatInput.vue';
 import ChatMessages from '@/Components/Chat/ChatMessages.vue';
 import ChatSidebar from '@/Components/Chat/ChatSidebar.vue';
+import { useEcho } from '@/composables/useEcho';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, Link, useForm } from '@inertiajs/vue3';
-import Echo from 'laravel-echo';
-import { onMounted, onUnmounted, ref, shallowRef } from 'vue';
+import { Head, router, useForm, usePage } from '@inertiajs/vue3';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
 
 interface Chat {
     id: string;
@@ -44,11 +44,48 @@ interface Message {
 
 const props = defineProps<{
     chats: Chat[];
-    currentChat: Chat;
+    currentChat: Chat | null;
     messages: Message[];
 }>();
 
+const isSidebarOpen = ref(true);
+onMounted(() => {
+    if (window.innerWidth < 768) {
+        isSidebarOpen.value = false;
+    }
+});
+const page = usePage();
+watch(
+    () => page.url,
+    () => {
+        if (window.innerWidth < 768) {
+            isSidebarOpen.value = false;
+        }
+    },
+);
+
 const localMessages = ref<Message[]>([...props.messages]);
+
+const isAiProcessing = ref(false);
+const activeAgentSteps = ref<AgentStep[]>([]);
+
+watch(
+    () => props.messages,
+    (newVal) => {
+        localMessages.value = [...newVal];
+        if (isAiProcessing.value) {
+            localMessages.value.push({
+                id: 'temp-loader',
+                role: 'assistant',
+                content: '',
+                is_loading: true,
+                agent_steps: [...activeAgentSteps.value],
+                created_at: new Date().toISOString(),
+            });
+        }
+    },
+    { deep: true },
+);
 const form = useForm({
     content: '',
     images: [] as File[],
@@ -107,7 +144,6 @@ const handleSend = ({
 
     // UUID collision-free untuk ID pesan sementara (Senior-level standard)
     const tempUserMsgId = `temp-${crypto.randomUUID()}`;
-    const tempAssistantMsgId = `temp-${crypto.randomUUID()}`;
 
     // Konversi file lokal menjadi Object URL dengan tracking memori untuk revoke kelak
     const localPreviews = images.map((file) => {
@@ -116,146 +152,244 @@ const handleSend = ({
         return url;
     });
 
+    isAiProcessing.value = true;
+    activeAgentSteps.value = [];
+
     createOptimisticMessages(
         content,
         localPreviews,
         tempUserMsgId,
-        tempAssistantMsgId,
+        'temp-loader',
     );
 
-    // Kirim Inertia form ke controller backend
-    form.post(route('chats.messages.store', props.currentChat.id), {
-        onSuccess: () => {
-            form.reset();
-        },
-        onError: () => {
-            removeOptimisticMessages(tempUserMsgId, tempAssistantMsgId);
-        },
-    });
+    // Kirim Inertia form ke controller backend secara dinamis
+    if (!props.currentChat) {
+        form.post(route('chats.store'), {
+            onSuccess: () => {
+                form.reset();
+            },
+            onError: () => {
+                isAiProcessing.value = false;
+                activeAgentSteps.value = [];
+                removeOptimisticMessages(tempUserMsgId, 'temp-loader');
+            },
+        });
+    } else {
+        form.post(route('chats.messages.store', props.currentChat.id), {
+            onSuccess: () => {
+                form.reset();
+            },
+            onError: () => {
+                isAiProcessing.value = false;
+                activeAgentSteps.value = [];
+                removeOptimisticMessages(tempUserMsgId, 'temp-loader');
+            },
+        });
+    }
 };
 
-// Pengelolaan Laravel Echo WebSocket (Reverb) - Menggunakan shallowRef (Senior performance optimization)
-const echoInstance = shallowRef<Echo<'reverb'> | null>(null);
+// Pengelolaan Laravel Echo WebSocket (Reverb) menggunakan composable useEcho (Standar Industri Mei 2026)
+const { listenPrivate, leaveChannel } = useEcho();
+const currentSubscribedChannel = ref<string | null>(null);
 
-onMounted(() => {
-    // window.Pusher diinisialisasi secara bersih di bootstrap.js untuk mencegah global mutation anti-pattern
+watch(
+    () => props.currentChat,
+    (newChat) => {
+        // Lepas channel lama jika ada
+        if (currentSubscribedChannel.value) {
+            leaveChannel(currentSubscribedChannel.value);
+            currentSubscribedChannel.value = null;
+        }
 
-    echoInstance.value = new Echo({
-        broadcaster: 'reverb',
-        key: import.meta.env.VITE_REVERB_APP_KEY,
-        wsHost: import.meta.env.VITE_REVERB_HOST ?? window.location.hostname,
-        wsPort: import.meta.env.VITE_REVERB_PORT ?? 8080,
-        wssPort: import.meta.env.VITE_REVERB_PORT ?? 443,
-        forceTLS: (import.meta.env.VITE_REVERB_SCHEME ?? 'https') === 'https',
-        enabledTransports: ['ws', 'wss'],
+        if (newChat) {
+            const channelName = `chats.${newChat.id}`;
+            currentSubscribedChannel.value = channelName;
+
+            listenPrivate(channelName, [
+                {
+                    name: 'AgentStepStarted',
+                    callback: (event: {
+                        stepIndex: number;
+                        toolName: string;
+                    }) => {
+                        const step: AgentStep = {
+                            step: event.stepIndex,
+                            tool: event.toolName,
+                            status: 'running',
+                        };
+                        activeAgentSteps.value.push(step);
+
+                        const idx = localMessages.value.findIndex(
+                            (m) => m.id === 'temp-loader',
+                        );
+                        if (idx !== -1) {
+                            localMessages.value[idx] = {
+                                ...localMessages.value[idx],
+                                agent_steps: [...activeAgentSteps.value],
+                            };
+                        }
+                    },
+                },
+                {
+                    name: 'AgentStepCompleted',
+                    callback: (event: {
+                        stepIndex: number;
+                        result: unknown;
+                    }) => {
+                        activeAgentSteps.value = activeAgentSteps.value.map(
+                            (s) => {
+                                if (s.step === event.stepIndex) {
+                                    return {
+                                        ...s,
+                                        status: 'success' as const,
+                                        result: event.result,
+                                    };
+                                }
+                                return s;
+                            },
+                        );
+
+                        const idx = localMessages.value.findIndex(
+                            (m) => m.id === 'temp-loader',
+                        );
+                        if (idx !== -1) {
+                            localMessages.value[idx] = {
+                                ...localMessages.value[idx],
+                                agent_steps: [...activeAgentSteps.value],
+                            };
+                        }
+                    },
+                },
+                {
+                    name: 'AgentResponseGenerated',
+                    callback: (event: {
+                        messageId: string;
+                        content: string;
+                        chartData: ChartData | null;
+                    }) => {
+                        isAiProcessing.value = false;
+                        const prevSteps = [...activeAgentSteps.value];
+                        activeAgentSteps.value = [];
+
+                        const loadingIdx = localMessages.value.findIndex(
+                            (m) => m.id === 'temp-loader',
+                        );
+                        if (loadingIdx !== -1) {
+                            localMessages.value.splice(loadingIdx, 1);
+                        }
+
+                        localMessages.value.push({
+                            id: event.messageId,
+                            role: 'assistant',
+                            content: event.content,
+                            chart_data: event.chartData,
+                            agent_steps: prevSteps,
+                            created_at: new Date().toISOString(),
+                        });
+                    },
+                },
+            ]);
+        }
+    },
+    { immediate: true },
+);
+
+const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null);
+
+// Sunting perintah user
+const handleEditMessage = (content: string) => {
+    if (chatInputRef.value) {
+        chatInputRef.value.content = content;
+        chatInputRef.value.focus();
+    }
+};
+
+// Buat ulang jawaban AI (Regenerate)
+const handleRegenerateMessage = (messageId: string | number) => {
+    if (!props.currentChat) return;
+
+    // Cari indeks pesan asisten
+    const idx = localMessages.value.findIndex((m) => m.id === messageId);
+    if (idx === -1) return;
+
+    // Hapus pesan asisten dan tampilkan state loading
+    localMessages.value.splice(idx, 1);
+
+    isAiProcessing.value = true;
+    activeAgentSteps.value = [];
+
+    // Siapkan temporary assistant message untuk loader visual
+    localMessages.value.push({
+        id: 'temp-loader',
+        role: 'assistant',
+        content: '',
+        is_loading: true,
+        agent_steps: [],
+        created_at: new Date().toISOString(),
     });
 
-    echoInstance.value
-        .private(`chats.${props.currentChat.id}`)
-        .listen(
-            'AgentStepStarted',
-            (event: { stepIndex: number; toolName: string }) => {
-                // Immutable Update Pattern untuk menjamin reaktivitas penuh pada objek bersarang
-                const idx = localMessages.value.findIndex(
-                    (m) => m.is_loading === true,
-                );
-                if (idx !== -1) {
-                    const currentMsg = localMessages.value[idx];
-                    const steps = currentMsg.agent_steps
-                        ? [...currentMsg.agent_steps]
-                        : [];
-                    steps.push({
-                        step: event.stepIndex,
-                        tool: event.toolName,
-                        status: 'running',
-                    });
-                    localMessages.value[idx] = {
-                        ...currentMsg,
-                        agent_steps: steps,
-                    };
-                }
+    // Jalankan request ke backend untuk men-delete dan men-dispatch ulang agent job
+    router.post(
+        route('chats.messages.regenerate', {
+            chat: props.currentChat.id,
+            message: messageId,
+        }),
+        {},
+        {
+            onFinish: () => {
+                // Biarkan websocket atau inertia sync menangani data terbaru
             },
-        )
-        .listen(
-            'AgentStepCompleted',
-            (event: { stepIndex: number; result: unknown }) => {
-                // Immutable Update Pattern untuk status langkah berpikir MCP
-                const idx = localMessages.value.findIndex(
-                    (m) => m.is_loading === true,
-                );
-                if (idx !== -1) {
-                    const currentMsg = localMessages.value[idx];
-                    if (currentMsg.agent_steps) {
-                        const steps = currentMsg.agent_steps.map((s) => {
-                            if (s.step === event.stepIndex) {
-                                return {
-                                    ...s,
-                                    status: 'success' as const,
-                                    result: event.result,
-                                };
-                            }
-                            return s;
-                        });
-                        localMessages.value[idx] = {
-                            ...currentMsg,
-                            agent_steps: steps,
-                        };
-                    }
-                }
+            onError: () => {
+                // Rollback jika terjadi kesalahan koneksi
+                isAiProcessing.value = false;
+                activeAgentSteps.value = [];
+                router.reload();
             },
-        )
-        .listen(
-            'AgentResponseGenerated',
-            (event: {
-                messageId: string;
-                content: string;
-                chartData: ChartData | null;
-            }) => {
-                const loadingIdx = localMessages.value.findIndex(
-                    (m) => m.is_loading === true,
-                );
-                const prevSteps =
-                    loadingIdx !== -1
-                        ? localMessages.value[loadingIdx].agent_steps
-                        : [];
+        },
+    );
+};
 
-                if (loadingIdx !== -1) {
-                    localMessages.value.splice(loadingIdx, 1);
-                }
-
-                localMessages.value.push({
-                    id: event.messageId,
-                    role: 'assistant',
-                    content: event.content,
-                    chart_data: event.chartData,
-                    agent_steps: prevSteps,
-                    created_at: new Date().toISOString(),
-                });
-            },
-        );
-});
+// Mulai percakapan baru
+const handleNewChat = () => {
+    router.visit(route('dashboard'));
+};
 
 onUnmounted(() => {
-    if (echoInstance.value) {
-        echoInstance.value.leave(`chats.${props.currentChat.id}`);
-    }
     // Revoke seluruh Object URL yang dialokasikan di memori browser (Pencegahan kebocoran memori level senior)
     objectUrls.value.forEach((url) => URL.revokeObjectURL(url));
 });
 </script>
 
 <template>
-    <Head :title="currentChat.title" />
+    <Head :title="currentChat ? currentChat.title : 'Percakapan Baru'" />
 
-    <AuthenticatedLayout>
+    <AuthenticatedLayout hideNav>
         <div
-            class="flex h-[calc(100vh-64px)] overflow-hidden bg-[#f0f4f9] font-sans dark:bg-[#131314]"
+            class="flex h-screen overflow-hidden bg-[#f0f4f9] font-sans dark:bg-[#131314]"
         >
             <!-- Sidebar Sesi Kiri (Datar & Dikecualikan Garis Pembatas Kaku) -->
-            <ChatSidebar
-                :chats="chats"
-                :currentChat="currentChat"
-                class="hidden md:flex"
+            <div
+                class="fixed inset-y-0 left-0 z-40 flex shrink-0 transition-all duration-300 ease-in-out md:relative md:z-0 md:flex md:overflow-hidden md:shadow-none"
+                :class="
+                    isSidebarOpen
+                        ? 'w-80 translate-x-0 shadow-2xl'
+                        : 'w-80 -translate-x-full overflow-hidden md:w-0 md:translate-x-0'
+                "
+            >
+                <div class="h-full w-80 shrink-0">
+                    <ChatSidebar
+                        :chats="chats"
+                        :currentChat="currentChat"
+                        @close="isSidebarOpen = false"
+                    />
+                </div>
+            </div>
+
+            <!-- Mobile Sidebar Backdrop Overlay -->
+            <div
+                v-if="isSidebarOpen"
+                class="fixed inset-0 z-30 bg-black/40 backdrop-blur-sm transition-opacity duration-300 md:hidden"
+                @click="isSidebarOpen = false"
             />
 
             <!-- Viewport Obrolan Utama -->
@@ -267,12 +401,16 @@ onUnmounted(() => {
                     class="border-gray-250/20 z-10 flex h-16 shrink-0 select-none items-center justify-between border-b bg-white/40 px-6 backdrop-blur-md dark:border-gray-800/20 dark:bg-[#131314]/40"
                 >
                     <div class="flex items-center gap-3">
-                        <Link
-                            href="/dashboard"
-                            class="dark:hover:bg-gray-850/50 mr-1 rounded-full p-1.5 text-gray-500 transition hover:bg-gray-200/50 md:hidden"
+                        <!-- Hamburger Menu Button (visible when sidebar is closed) -->
+                        <button
+                            v-if="!isSidebarOpen"
+                            type="button"
+                            @click="isSidebarOpen = true"
+                            class="dark:hover:bg-gray-850/50 mr-1 rounded-full p-1.5 text-gray-500 transition hover:bg-gray-200/50"
+                            title="Buka menu obrolan"
                         >
                             <svg
-                                class="w-5.5 h-5.5"
+                                class="h-5 w-5"
                                 fill="none"
                                 stroke="currentColor"
                                 viewBox="0 0 24 24"
@@ -281,15 +419,19 @@ onUnmounted(() => {
                                     stroke-linecap="round"
                                     stroke-linejoin="round"
                                     stroke-width="2"
-                                    d="M15 19l-7-7 7-7"
+                                    d="M4 6h16M4 12h16M4 18h16"
                                 />
                             </svg>
-                        </Link>
+                        </button>
                         <div>
                             <h2
                                 class="max-w-xs truncate font-sans text-xs font-extrabold tracking-wide text-gray-800 md:max-w-md dark:text-white"
                             >
-                                {{ currentChat.title }}
+                                {{
+                                    currentChat
+                                        ? currentChat.title
+                                        : 'Percakapan Baru'
+                                }}
                             </h2>
                             <p
                                 class="font-sans text-[9px] font-extrabold uppercase tracking-widest text-gray-400 dark:text-gray-500"
@@ -298,28 +440,25 @@ onUnmounted(() => {
                             </p>
                         </div>
                     </div>
-
-                    <!-- Status Badge Server Actives -->
-                    <div class="flex items-center gap-3">
-                        <div
-                            class="flex items-center gap-1.5 rounded-full border border-green-200/30 bg-green-50 px-3 py-1 font-sans text-[9px] font-extrabold uppercase tracking-wider text-green-700 dark:bg-green-950/30 dark:text-green-400"
-                        >
-                            <span
-                                class="h-1.5 w-1.5 animate-pulse rounded-full bg-green-500"
-                            ></span>
-                            BPS Active
-                        </div>
-                    </div>
                 </div>
 
                 <!-- Daftar Aliran Pesan Obrolan -->
-                <ChatMessages :messages="localMessages" />
+                <ChatMessages
+                    :messages="localMessages"
+                    @select-prompt="
+                        (p) => handleSend({ content: p, images: [] })
+                    "
+                    @edit-message="handleEditMessage"
+                    @regenerate-message="handleRegenerateMessage"
+                    @new-chat="handleNewChat"
+                />
 
                 <!-- Footer Input Kapsul Mengambang (Fade Gradient Background) -->
                 <div
                     class="z-10 shrink-0 bg-gradient-to-t from-[#f0f4f9] via-[#f0f4f9] to-transparent pb-6 pt-2 dark:from-[#131314] dark:via-[#131314] dark:to-transparent"
                 >
                     <ChatInput
+                        ref="chatInputRef"
                         :processing="form.processing"
                         @send="handleSend"
                     />

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Link, router, useForm } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 
 interface Chat {
     id: string;
@@ -11,7 +11,11 @@ interface Chat {
 
 const props = defineProps<{
     chats: Chat[];
-    currentChat: Chat;
+    currentChat: Chat | null;
+}>();
+
+const emit = defineEmits<{
+    (e: 'close'): void;
 }>();
 
 // State untuk pengeditan topik obrolan secara inline
@@ -103,11 +107,25 @@ const filteredGroupedChats = computed(() => {
 
     return groups;
 });
+
+// State dan penanganan dropdown profil/pengaturan
+const showSettingsDropdown = ref(false);
+const closeSettingsDropdown = () => {
+    showSettingsDropdown.value = false;
+};
+
+onMounted(() => {
+    window.addEventListener('click', closeSettingsDropdown);
+});
+
+onUnmounted(() => {
+    window.removeEventListener('click', closeSettingsDropdown);
+});
 </script>
 
 <template>
     <div
-        class="relative flex w-80 shrink-0 select-none flex-col bg-[#f0f4f9] transition-all duration-300 dark:bg-[#0e0e10]"
+        class="flex h-full w-full select-none flex-col bg-[#f0f4f9] dark:bg-[#0e0e10]"
     >
         <!-- Sidebar Brand Header -->
         <div class="flex items-center justify-between px-5 py-4">
@@ -117,7 +135,7 @@ const filteredGroupedChats = computed(() => {
                     class="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-tr from-blue-500 via-indigo-500 to-pink-500 text-white shadow-md"
                 >
                     <svg
-                        class="w-4.5 h-4.5 animate-pulse"
+                        class="h-4 w-4 animate-pulse"
                         fill="currentColor"
                         viewBox="0 0 24 24"
                     >
@@ -137,6 +155,7 @@ const filteredGroupedChats = computed(() => {
             <button
                 class="rounded-full p-1.5 text-gray-500 transition hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-800"
                 title="Sembunyikan Sidebar"
+                @click="emit('close')"
             >
                 <svg
                     class="h-5 w-5"
@@ -161,7 +180,7 @@ const filteredGroupedChats = computed(() => {
                 class="group flex items-center gap-3 rounded-full bg-[#e3e3e3]/50 px-4 py-3 text-xs font-semibold text-gray-800 shadow-sm transition hover:bg-[#e3e3e3] dark:bg-[#1e1f20]/60 dark:text-gray-200 dark:hover:bg-[#1e1f20]"
             >
                 <svg
-                    class="w-4.5 h-4.5 text-gray-600 transition-transform group-hover:rotate-12 dark:text-gray-300"
+                    class="h-4 w-4 text-gray-600 transition-transform group-hover:rotate-12 dark:text-gray-300"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -243,7 +262,7 @@ const filteredGroupedChats = computed(() => {
                             :key="chat.id"
                             :class="[
                                 'group relative flex select-text items-center rounded-full px-3 py-2 transition-all duration-200',
-                                chat.id === currentChat.id
+                                chat.id === currentChat?.id
                                     ? 'bg-[#e3e3e3] font-semibold text-gray-900 dark:bg-[#1e1f20] dark:text-white'
                                     : 'text-gray-700 hover:bg-gray-200/50 dark:text-gray-300 dark:hover:bg-[#1e1f20]/30',
                             ]"
@@ -257,7 +276,7 @@ const filteredGroupedChats = computed(() => {
                                 <svg
                                     :class="[
                                         'h-4 w-4 shrink-0 transition-colors',
-                                        chat.id === currentChat.id
+                                        chat.id === currentChat?.id
                                             ? 'text-blue-500 dark:text-blue-400'
                                             : 'text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-200',
                                     ]"
@@ -407,21 +426,138 @@ const filteredGroupedChats = computed(() => {
             </div>
         </div>
 
-        <!-- Custom styling for thin scrollbars -->
-        <style scoped>
-            .scrollbar-thin::-webkit-scrollbar {
-                width: 4px;
-            }
-            .scrollbar-thin::-webkit-scrollbar-track {
-                background: transparent;
-            }
-            .scrollbar-thin::-webkit-scrollbar-thumb {
-                background: rgba(156, 163, 175, 0.2);
-                border-radius: 9999px;
-            }
-            .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-                background: rgba(156, 163, 175, 0.4);
-            }
-        </style>
+        <!-- Profil Pengguna & Pengaturan di Bagian Bawah -->
+        <div
+            class="border-gray-250/20 relative border-t bg-white/40 p-4 dark:border-gray-800/20 dark:bg-[#0e0e10]/60"
+        >
+            <div class="flex items-center justify-between gap-3">
+                <div class="flex min-w-0 items-center gap-3">
+                    <!-- User Avatar -->
+                    <div
+                        class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-xs font-bold text-white shadow-sm"
+                    >
+                        {{ $page.props.auth.user.name.charAt(0).toUpperCase() }}
+                    </div>
+                    <!-- User Name & Email -->
+                    <div class="min-w-0">
+                        <p
+                            class="truncate text-xs font-semibold text-gray-800 dark:text-gray-200"
+                        >
+                            {{ $page.props.auth.user.name }}
+                        </p>
+                        <p
+                            class="truncate text-[10px] text-gray-400 dark:text-gray-500"
+                        >
+                            {{ $page.props.auth.user.email }}
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Tombol Settings & Dropdown ke Atas -->
+                <div class="relative">
+                    <button
+                        type="button"
+                        @click.stop="
+                            showSettingsDropdown = !showSettingsDropdown
+                        "
+                        class="rounded-full p-1.5 text-gray-500 hover:bg-gray-200 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+                        title="Buka Pengaturan"
+                    >
+                        <svg
+                            class="h-4.5 w-4.5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                            />
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                            />
+                        </svg>
+                    </button>
+
+                    <!-- Upward Dropdown Menu -->
+                    <Transition
+                        enter-active-class="transition ease-out duration-200"
+                        enter-from-class="opacity-0 scale-95 translate-y-2"
+                        enter-to-class="opacity-100 scale-100 translate-y-0"
+                        leave-active-class="transition ease-in duration-75"
+                        leave-from-class="opacity-100 scale-100 translate-y-0"
+                        leave-to-class="opacity-0 scale-95 translate-y-2"
+                    >
+                        <div
+                            v-if="showSettingsDropdown"
+                            class="absolute bottom-full right-0 z-50 mb-2 w-48 rounded-xl border border-gray-200/50 bg-white py-1.5 shadow-lg ring-1 ring-black/5 dark:border-gray-800/60 dark:bg-[#1e1f20]"
+                        >
+                            <Link
+                                :href="route('profile.edit')"
+                                class="flex w-full items-center gap-2 px-3 py-2 text-left font-sans text-xs text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800/50"
+                            >
+                                <svg
+                                    class="h-3.5 w-3.5 text-gray-400"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                                    />
+                                </svg>
+                                <span>Pengaturan Profil</span>
+                            </Link>
+                            <Link
+                                :href="route('logout')"
+                                method="post"
+                                as="button"
+                                class="flex w-full items-center gap-2 px-3 py-2 text-left font-sans text-xs text-red-600 hover:bg-gray-50 dark:text-red-400 dark:hover:bg-gray-800/50"
+                            >
+                                <svg
+                                    class="h-3.5 w-3.5 text-red-400"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                                    />
+                                </svg>
+                                <span>Keluar Sesi</span>
+                            </Link>
+                        </div>
+                    </Transition>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
+
+<!-- Custom styling for thin scrollbars -->
+<style scoped>
+.scrollbar-thin::-webkit-scrollbar {
+    width: 4px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+    background: rgba(156, 163, 175, 0.2);
+    border-radius: 9999px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: rgba(156, 163, 175, 0.4);
+}
+</style>

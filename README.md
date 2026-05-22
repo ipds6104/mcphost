@@ -49,7 +49,7 @@ Press `Ctrl+C` at any time to cleanly stop all concurrent services and backgroun
 For Coolify and staging/production clusters, we have decoupled and isolated the docker setup under `/docker` to enforce rolling zero-downtime updates:
 
 - **Dockerfile**: [docker/Dockerfile](file:///docker/Dockerfile) uses a two-stage rolling container build:
-  1. Compiles frontend assets via Node 20.
+  1. Compiles frontend assets via Bun.
   2. Runs high-performance PHP 8.3 FPM & Nginx container for ultimate speed.
 - **Entrypoint**: [docker/entrypoint.sh](file:///docker/entrypoint.sh) supports automated migrations on boot if the environment variable `RUN_MIGRATIONS=true` is set.
 
