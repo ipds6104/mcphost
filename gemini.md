@@ -258,5 +258,12 @@ Setiap pengembangan lanjutan wajib mematuhi aturan ketat di bawah ini tanpa komp
         *   Melakukan pembersihan berkas bootstrap Laravel (`php artisan optimize:clear`).
         *   Menjalankan validasi linting frontend (`bun run lint`) 👉 100% PASS.
         *   Mengeksekusi kompilasi produksi Vite (`bun run build`) 👉 Sukses dalam 1.92 detik.
-
-
+*   **25 Mei 2026:** 🚀 **Implementasi Remote MCP Server SSE Client & Integrasi Database.**
+    *   *Deskripsi:* Mengimplementasikan arsitektur MCP Server dinamis berbasis database (`mcp_servers`) dan SSE transport client (`McpSseClient.php`).
+    *   *Peningkatan Utama:*
+        *   **Database Integration:** Membuat migrasi `create_mcp_servers_table` dengan UUID primary key, model `McpServer`, dan `McpServerSeeder` untuk menyimpan konfigurasi remote MCP servers secara persisten dan modular.
+        *   **SSE Client (McpSseClient.php):** Mengembangkan client SSE mandiri menggunakan standard PHP stream context untuk melakukan handshake, mempertahankan persistent stream, dan berkomunikasi via JSON-RPC 2.0 over HTTP POST.
+        *   **Broadcasting Real-time Instan:** Mengubah events (`AgentResponseGenerated`, `AgentStepCompleted`, `AgentStepStarted`) agar mengimplementasikan `ShouldBroadcastNow` alih-alih `ShouldBroadcast`, mengeliminasi overhead antrean job redis dan menyajikan visualisasi progress AI secara real-time di UI.
+        *   **Peningkatan Ketahanan & Timeout:** Meningkatkan timeout pada Docker worker queue listener di `docker-compose.yml` menjadi 600 detik dan memodifikasi `ProcessAiAgentQuery.php` untuk mendukung orkestrasi tools dinamis.
+        *   **Tooling & Validasi:** Menambahkan skrip verifikasi DB dan benchmark E2E (`storage/test_mcp.php`, `storage/test_mcp_sse.php`, `storage/inspect_db.php`, `benchmark-e2e.php`) untuk memvalidasi kelancaran integrasi SSE.
+    *   *Verifikasi:* Seluruh kode tervalidasi 100% lulus Laravel Pint format checker tanpa kegagalan (`PASS`).

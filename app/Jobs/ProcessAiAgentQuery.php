@@ -31,17 +31,8 @@ class ProcessAiAgentQuery implements ShouldQueue
 
     /**
      * Execute the job.
-     *
-     * Alur baru yang benar:
-     * 1. Buat trace context untuk observabilitas
-     * 2. Muat riwayat percakapan dari DB (konteks AI)
-     * 3. Inisialisasi MockMcpTool sebagai tools yang dapat dipanggil LLM
-     * 4. Jalankan LLM (selalu — jika ada API key); jika tidak, kembalikan pesan error informatif
-     * 5. Parsing chart data dari respons
-     * 6. Simpan ke DB & broadcast via WebSocket
-     * 7. Log trace selesai
      */
-    public function handle(MockMcpToolProvider $mockProvider): void
+    public function handle(): void
     {
         // ┌─────────────────────────────────────────────────────────────┐
         // │  TRACE CONTEXT — Structured Observability (Standar Ke-13)  │
@@ -54,8 +45,6 @@ class ProcessAiAgentQuery implements ShouldQueue
         $userMessage = Message::findOrFail($this->userMessageId);
 
         // ── Baca konfigurasi AI dari config() — BUKAN env() ─────────────
-        // PENTING: env() tidak berfungsi di jobs setelah `php artisan optimize`
-        // karena config sudah di-cache. Selalu gunakan config() untuk runtime.
         $provider = config('ai.default', 'openai');
         $model = config('ai.default_model', 'gemini-3-flash');
         $providerKey = config("ai.providers.{$provider}.key");
@@ -79,23 +68,26 @@ class ProcessAiAgentQuery implements ShouldQueue
             $msg->content
         ))->all();
 
-        // ── 2. Inisialisasi Mock MCP Tools dari MockMcpToolProvider ──────
+        // ── 2. Muat Mock MCP Tools Secara Langsung ────────
         $state = (object) ['stepIndex' => 0, 'steps' => []];
+        $tools = [];
 
-        $mockToolDefs = $mockProvider->getTools();
-        $tools = array_map(fn (array $toolDef) => new MockMcpTool(
-            toolName: $toolDef['name'],
-            toolDescription: $toolDef['description'],
-            provider: $mockProvider,
-            chatId: $this->chatId,
-            state: $state,
-        ), $mockToolDefs);
+        $mockProvider = new MockMcpToolProvider();
+        foreach ($mockProvider->getTools() as $toolData) {
+            $tools[] = new MockMcpTool(
+                toolName: $toolData['name'],
+                toolDescription: $toolData['description'],
+                provider: $mockProvider,
+                chatId: $this->chatId,
+                state: $state
+            );
+        }
 
         Log::channel('ai_agent')->debug('ai_agent.mock_tools_ready', [
             'trace_id' => $traceId,
             'chat_id' => $this->chatId,
             'tool_count' => count($tools),
-            'tool_names' => array_column($mockToolDefs, 'name'),
+            'tool_names' => array_map(fn ($t) => $t->name(), $tools),
         ]);
 
         // ── 3. Siapkan multimodal attachments (gambar, dll.) ─────────────
@@ -124,14 +116,59 @@ class ProcessAiAgentQuery implements ShouldQueue
         } else {
             try {
                 $agent = new GovtAnalyticsAgent(
-                    instructions: implode(' ', [
+                    instructions: implode("\n", [
+                        '# IDENTITAS & PERAN',
                         'Anda adalah Asisten Analitis Statistik Pemerintah Indonesia yang handal dan cerdas.',
-                        'Anda memiliki akses ke tools BPS (Badan Pusat Statistik) untuk mengambil data statistik daerah.',
-                        'Gunakan tools hanya jika pertanyaan pengguna memerlukan data statistik spesifik.',
-                        'Untuk pertanyaan umum, jawab langsung dengan pengetahuan Anda tanpa memanggil tools.',
-                        'Selalu gunakan Bahasa Indonesia yang baik dan profesional.',
-                        'Format jawaban dengan Markdown untuk keterbacaan yang optimal.',
-                        'PENTING: Jika Anda menyajikan data dalam bentuk tabel, Anda WAJIB menggunakan format tabel Markdown GFM standar dengan garis pembatas (menggunakan karakter pipe | dan tanda hubung - seperti | Indikator | Nilai |). DILARANG KERAS menyajikan tabel menggunakan spasi kosong sebagai kolom penyelarasan agar tabel dapat dirender dengan rapi di frontend.',
+                        'Waktu sekarang: ' . now()->translatedFormat('l, d F Y') . ' pukul ' . now()->format('H:i') . ' WIB.',
+                        '',
+                        '# ALUR KERJA WAJIB (IKUTI URUTAN INI)',
+                        '1. PLAN: Tentukan data apa saja yang dibutuhkan sebelum memanggil tool apapun.',
+                        '2. EXECUTE: Panggil SEMUA data yang diperlukan dalam SATU langkah paralel menggunakan execute_js + Promise.all().',
+                        '3. ANALYZE: Analisis data yang diterima dan buat jawaban komprehensif.',
+                        '4. RESPOND: Berikan jawaban dalam format Markdown yang rapi.',
+                        '',
+                        '# ATURAN KRITIS — WAJIB DIPATUHI',
+                        '',
+                        '## A. GUNAKAN bps_query UNTUK KOMPARASI WILAYAH (CARA PALING EFISIEN)',
+                        'Untuk pertanyaan komparasi antar wilayah (misal: "bandingkan Kutai Timur vs Mempawah"),',
+                        'SELALU gunakan tool bps_query dengan parameter wilayah yang tepat.',
+                        'Tool bps_query sudah menangani pencarian domain, variabel, dan data secara otomatis.',
+                        'JANGAN gunakan execute_js + simdasi-regions atau domain lookup manual untuk komparasi regional.',
+                        '',
+                        '## B. FORMAT RESPONS API BPS — STRUKTUR DATA YANG BENAR',
+                        'Semua endpoint bpsFetch mengembalikan: { status: 200, data: [pagination_obj, data_array] }',
+                        'SELALU ambil data dengan: response.data[1] (array), bukan response.data atau response langsung.',
+                        'Contoh: bpsFetch("/domain", { type: "all" }) => domain list ada di: result.data[1]',
+                        'Contoh: bpsFetch("/list", { model: "var", domain: "6404" }) => var list ada di: result.data[1]',
+                        '',
+                        '## C. KODE DOMAIN WILAYAH — SUDAH DIKETAHUI, JANGAN CARI ULANG',
+                        'Kutai Timur (Kaltim): domain_id = "6404" (kode BPS Kabupaten Kutai Timur)',
+                        'Mempawah (Kalbar): domain_id = "6104" (kode BPS Kabupaten Mempawah)',
+                        'Jika perlu domain wilayah lain, gunakan: bps_domain_list tool (bukan execute_js + /domain).',
+                        'JANGAN gunakan simdasi-regions untuk mencari kode wilayah — tool itu untuk data SIMDASI, bukan domain BPS.',
+                        '',
+                        '## D. STOP LOOP — MAKSIMAL 3 LANGKAH execute_js PER SESI',
+                        'Jika execute_js sudah mengembalikan data, JANGAN panggil API yang sama dengan variasi parameter.',
+                        'Jika data tidak tersedia, gunakan data yang ada untuk membuat analisis terbaik yang mungkin.',
+                        'Lebih baik jawaban parsial daripada loop tak terbatas.',
+                        '',
+                        '## E. PARALEL WAJIB — CONTOH KODE YANG BENAR',
+                        'Setiap request ke BPS memakan ~45 detik. WAJIB paralel, DILARANG sequential.',
+                        '```javascript',
+                        '// Contoh komparasi 2 wilayah dalam 1 langkah:',
+                        'const [d1, d2] = await Promise.all([',
+                        '  bps.bpsFetch("/list", { model: "var", domain: "6404", page: 1 }),',
+                        '  bps.bpsFetch("/list", { model: "var", domain: "6104", page: 1 })',
+                        ']);',
+                        'const extract = (r) => (r.data?.[1] || []).slice(0, 15).map(v => ({ id: v.var_id, name: v.title }));',
+                        'return { kutim: extract(d1), mempawah: extract(d2) };',
+                        '```',
+                        '',
+                        '# FORMAT OUTPUT WAJIB',
+                        '- Gunakan Bahasa Indonesia yang baik, formal, dan profesional.',
+                        '- Gunakan tabel Markdown GFM (pipe | dan tanda hubung -) untuk data tabular.',
+                        '- Gunakan heading ## dan ### untuk struktur laporan yang jelas.',
+                        '- Sertakan kesimpulan strategis dan rekomendasi kebijakan di akhir laporan.',
                     ]),
                     tools: $tools,
                     messages: $aiMessages

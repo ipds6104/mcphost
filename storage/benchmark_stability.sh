@@ -34,10 +34,11 @@ echo -e "${NC}$RUNNING_SERVICES"
 
 # Clear Laravel config & optimization cache before run
 # PENTING: Untuk memastikan perubahan kode (seperti MaxSteps) terdeteksi secara instan!
-echo -e "\n${CYAN}⚙️ Clearing application caches to ensure clean state...${NC}"
+echo -e "\n${CYAN}⚙️ Clearing application caches and flushing Redis to ensure clean state...${NC}"
 docker compose exec web php artisan config:clear
 docker compose exec web php artisan route:clear
 docker compose exec web php artisan optimize:clear
+docker compose exec redis redis-cli flushall
 
 # Restart worker if it was using queue:work to reload memory
 echo -e "${CYAN}🔄 Restarting queue workers...${NC}"

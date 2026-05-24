@@ -169,7 +169,7 @@ services:
       - PHP_OPCACHE_JIT=tracing
       - PHP_OPCACHE_JIT_BUFFER_SIZE=50M
       - PHP_OPCACHE_SAVE_COMMENTS=1
-    command: ["php", "artisan", "queue:listen", "--tries=3", "--timeout=240"]
+    command: ["php", "artisan", "queue:listen", "--tries=3", "--timeout=600"]
     depends_on:
       web:
         condition: service_healthy
