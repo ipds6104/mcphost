@@ -54,6 +54,9 @@ class McpSseClient
             throw new \Exception("Failed to open connection to remote SSE MCP server: {$sseUrl}");
         }
 
+        // Set stream read timeout to prevent hanging during handshake
+        stream_set_timeout($stream, 10);
+
         // We must read from the stream until we get the 'endpoint' event
         $sessionId = null;
         $postPath = null;
@@ -66,6 +69,11 @@ class McpSseClient
         while (! feof($stream) && $attempts++ < $maxAttempts) {
             $line = fgets($stream);
             if ($line === false) {
+                $info = stream_get_meta_data($stream);
+                if ($info['timed_out']) {
+                    fclose($stream);
+                    throw new \Exception('Handshake timed out after 10 seconds while reading from SSE stream.');
+                }
                 break;
             }
 
@@ -151,8 +159,11 @@ class McpSseClient
         $postQueryString = http_build_query($postParams);
         $finalPostUrl = $postUrl . ($postQueryString ? '&' . $postQueryString : '');
 
-        // Send HTTP POST using standard Laravel Http Client
-        $response = Http::withHeaders($headers)->post($finalPostUrl, $payload);
+        // Send HTTP POST using standard Laravel Http Client with strict timeouts
+        $response = Http::withHeaders($headers)
+            ->timeout(15)        // Maksimal waktu respon HTTP 15 detik
+            ->connectTimeout(5)  // Maksimal waktu koneksi HTTP 5 detik
+            ->post($finalPostUrl, $payload);
 
         if ($response->failed()) {
             fclose($stream);
@@ -165,8 +176,8 @@ class McpSseClient
         $maxAttempts = 500;
         $attempts = 0;
 
-        // Set stream read timeout
-        stream_set_timeout($stream, 45);
+        // Set stream read timeout to a safer 20 seconds limit
+        stream_set_timeout($stream, 20);
 
         while (! feof($stream) && $attempts++ < $maxAttempts) {
             $line = fgets($stream);
@@ -174,7 +185,7 @@ class McpSseClient
                 $info = stream_get_meta_data($stream);
                 if ($info['timed_out']) {
                     fclose($stream);
-                    throw new \Exception("SSE stream read timed out after 45 seconds while waiting for message id {$id}");
+                    throw new \Exception("SSE stream read timed out after 20 seconds while waiting for message id {$id}");
                 }
                 break;
             }

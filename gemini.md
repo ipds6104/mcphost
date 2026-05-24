@@ -265,5 +265,10 @@ Setiap pengembangan lanjutan wajib mematuhi aturan ketat di bawah ini tanpa komp
         *   **SSE Client (McpSseClient.php):** Mengembangkan client SSE mandiri menggunakan standard PHP stream context untuk melakukan handshake, mempertahankan persistent stream, dan berkomunikasi via JSON-RPC 2.0 over HTTP POST.
         *   **Broadcasting Real-time Instan:** Mengubah events (`AgentResponseGenerated`, `AgentStepCompleted`, `AgentStepStarted`) agar mengimplementasikan `ShouldBroadcastNow` alih-alih `ShouldBroadcast`, mengeliminasi overhead antrean job redis dan menyajikan visualisasi progress AI secara real-time di UI.
         *   **Peningkatan Ketahanan & Timeout:** Meningkatkan timeout pada Docker worker queue listener di `docker-compose.yml` menjadi 600 detik dan memodifikasi `ProcessAiAgentQuery.php` untuk mendukung orkestrasi tools dinamis.
-        *   **Tooling & Validasi:** Menambahkan skrip verifikasi DB dan benchmark E2E (`storage/test_mcp.php`, `storage/test_mcp_sse.php`, `storage/inspect_db.php`, `benchmark-e2e.php`) untuk memvalidasi kelancaran integrasi SSE.
-    *   *Verifikasi:* Seluruh kode tervalidasi 100% lulus Laravel Pint format checker tanpa kegagalan (`PASS`).
+*   **25 Mei 2026:** ⚡ **Penyelesaian Latensi & Resolusi I/O Blocking Sistem (Fase 1).**
+    *   *Deskripsi:* Mengatasi dan mencegah kendala UI menggantung (*hanging*) akibat I/O blocking saat API luar lambat dengan mengimplementasikan strict timeouts dan lifecycle fail-safe handlers.
+    *   *Peningkatan Utama:*
+        *   **Strict cURL & Stream Timeouts (`McpSseClient.php`):** Membatasi waktu read stream handshake maksimal 10 detik, membatasi timeout HTTP POST maksimal 15 detik (koneksi 5 detik), dan stream read respon maksimal 20 detik untuk mengeliminasi status I/O blocking sinkron.
+        *   **Graceful Failed Lifecycle Hook (`ProcessAiAgentQuery.php`):** Mengatur batas waktu eksekusi antrean job `$timeout = 60` detik. Menambahkan method `failed()` untuk secara otomatis menangkap kegagalan/timeout job, memperbarui status percakapan dengan penjelasan kegagalan yang ramah, dan mem-broadcast event WebSocket untuk menghentikan pemuatan (spinner) di browser pengguna.
+        *   **start-dev.sh Port Transparency:** Memodifikasi berkas `start-dev.sh` untuk menampilkan daftar layanan dan port internal secara eksplisit saat inisialisasi lingkungan lokal.
+    *   *Verifikasi:* Validasi Laravel Pint format PASS bersih 100%.

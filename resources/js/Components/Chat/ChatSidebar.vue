@@ -11,7 +11,7 @@ interface Chat {
 
 const props = defineProps<{
     chats: Chat[];
-    currentChat: Chat;
+    currentChat: Chat | null;
 }>();
 
 // State untuk pengeditan topik obrolan secara inline
@@ -243,7 +243,7 @@ const filteredGroupedChats = computed(() => {
                             :key="chat.id"
                             :class="[
                                 'group relative flex select-text items-center rounded-full px-3 py-2 transition-all duration-200',
-                                chat.id === currentChat.id
+                                chat.id === currentChat?.id
                                     ? 'bg-[#e3e3e3] font-semibold text-gray-900 dark:bg-[#1e1f20] dark:text-white'
                                     : 'text-gray-700 hover:bg-gray-200/50 dark:text-gray-300 dark:hover:bg-[#1e1f20]/30',
                             ]"
@@ -257,7 +257,7 @@ const filteredGroupedChats = computed(() => {
                                 <svg
                                     :class="[
                                         'h-4 w-4 shrink-0 transition-colors',
-                                        chat.id === currentChat.id
+                                        chat.id === currentChat?.id
                                             ? 'text-blue-500 dark:text-blue-400'
                                             : 'text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-200',
                                     ]"

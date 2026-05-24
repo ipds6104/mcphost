@@ -22,6 +22,13 @@ class ProcessAiAgentQuery implements ShouldQueue
     use Queueable;
 
     /**
+     * Waktu maksimal eksekusi job sebelum di-terminate (detik).
+     *
+     * @var int
+     */
+    public $timeout = 60;
+
+    /**
      * Create a new job instance.
      */
     public function __construct(
@@ -257,5 +264,39 @@ class ProcessAiAgentQuery implements ShouldQueue
         }
 
         return null;
+    }
+
+    /**
+     * Handle a job failure (e.g. timeout or fatal exception).
+     * Menjamin UI pengguna tidak hang selamanya dan menerima info fallback yang jelas.
+     */
+    public function failed(\Throwable $exception): void
+    {
+        Log::channel('ai_agent')->error('ai_agent.job_failed_fatal', [
+            'chat_id' => $this->chatId,
+            'user_message_id' => $this->userMessageId,
+            'error' => $exception->getMessage(),
+            'exception' => get_class($exception),
+        ]);
+
+        $errorMessage = implode("\n\n", [
+            '❌ **Terjadi Jeda Waktu Koneksi (Timeout)**',
+            'Proses analisis data statistik ditangguhkan karena koneksi ke server AI atau remote BPS gateway melebihi batas waktu aman (60 detik).',
+            'Silakan klik tombol **Buat Ulang (Regenerate)** di bawah untuk mengirim ulang permintaan Anda.',
+        ]);
+
+        // Simpan pesan error ke database agar UI ter-update
+        $assistantMessage = Message::create([
+            'chat_id' => $this->chatId,
+            'role' => 'assistant',
+            'content' => $errorMessage,
+        ]);
+
+        // Broadcast ke WebSocket agar UI berhenti memuat
+        try {
+            event(new AgentResponseGenerated($this->chatId, $assistantMessage->id, $errorMessage, null));
+        } catch (\Exception $e) {
+            Log::warning('Failed to broadcast AgentResponseGenerated on job failure: ' . $e->getMessage());
+        }
     }
 }
