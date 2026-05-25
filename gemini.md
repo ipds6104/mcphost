@@ -410,3 +410,11 @@ Database lokal `bps_ground_truths` dan warm cache `bps_api_cache` harus dipeliha
         *   **Multi-Step Expansion Support:** Menggantikan status accordion tunggal (`activeStepDetail`) menjadi pencatatan peta ID reaktif (`expandedStepIds`), memungkinkan pengguna memperluas (*expand*) dan melihat detail respons JSON dari beberapa langkah tool secara bersamaan tanpa menutup langkah sebelumnya.
         *   **Tombol Kontrol Expand/Collapse All:** Menambahkan tombol dinamis *"Expand All Details" / "Collapse All Details"* dengan animasi reaktif. Tombol ini hanya muncul jika status sedang terbuka dan terdapat langkah pengerjaan yang memiliki data hasil (`result`).
         *   **Verifikasi Kompilasi:** Menjalankan kompilasi produksi Vite (`bun run build`) berhasil 100% lulus dalam 2.15 detik tanpa kesalahan linting atau tipe TypeScript.
+
+*   **25 Mei 2026:** ⚙️ **Peningkatan Keandalan & Bug Fix Crash \`entrypoint.dev.sh\` pada Fresh Database.**
+    *   *Deskripsi:* Mengatasi masalah crash loop pada kontainer \`mcphost-web\` ketika database dalam keadaan kosong/fresh akibat perintah pemeriksaan user count di bawah instruksi \`set -e\`.
+    *   *Solusi:*
+        *   **Robust Shell Execution (\`set +e\` / \`set -e\` blocks):** Memodifikasi [entrypoint.dev.sh](file:///wsl.localhost/Ubuntu/home/dmin/projects/mcphost/docker/entrypoint.dev.sh) untuk menonaktifkan sementara mode abort-on-error (\`set +e\`) saat melakukan pipeline query database \`User::count()\`. Hal ini mencegah subshell assignment pipeline (yang melempar exception QueryError karena tabel \`users\` belum ter-migrasi) men-crash paksa skrip entrypoint.
+        *   **Auto-Seeding Restoration:** Menjamin seeder default (\`db:seed\`) berjalan dengan sukses 100% saat database benar-benar kosong, menyelesaikan isu error *"These credentials do not match our records"* untuk user \`ihzakarunia@bps.go.id\` pada lingkungan pengembangan lokal.
+        *   **Keamanan Produksi:** Perubahan ini 100% aman karena hanya berdampak pada lingkungan pengembangan lokal (\`entrypoint.dev.sh\`), sehingga di lingkungan produksi (yang dikelola CI/CD melalui \`entrypoint.sh\` standar) data persisten Anda dijamin 100% aman tanpa risiko tertimpa/terhapus.
+
