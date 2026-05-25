@@ -91,6 +91,23 @@ watch(
 );
 
 const localMessages = ref<Message[]>([...props.messages]);
+const localChats = ref<Chat[]>([...props.chats]);
+const localCurrentChat = ref<Chat | null>(props.currentChat);
+
+watch(
+    () => props.chats,
+    (newChats) => {
+        localChats.value = [...newChats];
+    },
+    { deep: true },
+);
+
+watch(
+    () => props.currentChat,
+    (newChat) => {
+        localCurrentChat.value = newChat;
+    },
+);
 
 const isAiProcessing = ref(false);
 const activeAgentSteps = ref<AgentStep[]>([]);
@@ -184,6 +201,7 @@ const handleSend = ({
 
     isAiProcessing.value = true;
     activeAgentSteps.value = [];
+    isSidebarOpen.value = false;
 
     createOptimisticMessages(
         content,
@@ -372,6 +390,31 @@ watch(
                         }
                     },
                 },
+                {
+                    name: 'ChatTitleUpdated',
+                    callback: (event: { chatId: string; title: string }) => {
+                        console.log(
+                            `📝 [Chat Title Updated] New title: "${event.title}"`,
+                        );
+
+                        localChats.value = localChats.value.map((c) => {
+                            if (c.id === event.chatId) {
+                                return { ...c, title: event.title };
+                            }
+                            return c;
+                        });
+
+                        if (
+                            localCurrentChat.value &&
+                            localCurrentChat.value.id === event.chatId
+                        ) {
+                            localCurrentChat.value = {
+                                ...localCurrentChat.value,
+                                title: event.title,
+                            };
+                        }
+                    },
+                },
             ]);
         }
     },
@@ -406,6 +449,7 @@ const handleRegenerateMessage = (messageId: string | number) => {
 
     isAiProcessing.value = true;
     activeAgentSteps.value = [];
+    isSidebarOpen.value = false;
 
     // Siapkan temporary assistant message untuk loader visual
     localMessages.value.push({
@@ -450,7 +494,9 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <Head :title="currentChat ? currentChat.title : 'Percakapan Baru'" />
+    <Head
+        :title="localCurrentChat ? localCurrentChat.title : 'Percakapan Baru'"
+    />
 
     <AuthenticatedLayout hideNav>
         <div
@@ -467,8 +513,8 @@ onUnmounted(() => {
             >
                 <div class="h-full w-80 shrink-0">
                     <ChatSidebar
-                        :chats="chats"
-                        :currentChat="currentChat"
+                        :chats="localChats"
+                        :currentChat="localCurrentChat"
                         @close="isSidebarOpen = false"
                     />
                 </div>
@@ -517,8 +563,8 @@ onUnmounted(() => {
                                 class="max-w-xs truncate font-sans text-xs font-extrabold tracking-wide text-gray-800 md:max-w-md dark:text-white"
                             >
                                 {{
-                                    currentChat
-                                        ? currentChat.title
+                                    localCurrentChat
+                                        ? localCurrentChat.title
                                         : 'Percakapan Baru'
                                 }}
                             </h2>

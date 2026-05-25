@@ -30,8 +30,14 @@ export function renderMarkdown(content: string): string {
   if (!content) return ''
 
   try {
+    // Standardize newlines: convert \r\n to \n to prevent carriage return issues in regex
+    let normalizedContent = content.replace(/\r\n/g, '\n')
+
+    // Normalisasi headings: Bersihkan spasi inden sebelum # dan pastikan ada tepat satu spasi setelah #
+    normalizedContent = normalizedContent.replace(/^[^\S\n]*(#{1,6})[^\S\n]*(.+)$/gm, '$1 $2')
+
     // Step 1: Parse Markdown → raw HTML (mungkin mengandung XSS)
-    const rawHtml = marked.parse(content) as string
+    const rawHtml = marked.parse(normalizedContent) as string
 
     // Step 2: Sanitize — buang semua payload berbahaya (script, onerror, dll.)
     return DOMPurify.sanitize(rawHtml, {

@@ -37,4 +37,20 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | BPS WebAPI (Badan Pusat Statistik Indonesia)
+    |--------------------------------------------------------------------------
+    | Konfigurasi untuk integrasi dengan API resmi BPS Indonesia.
+    | API Key dapat diperoleh di: https://webapi.bps.go.id/developer/
+    |--------------------------------------------------------------------------
+    */
+    'bps' => [
+        'key' => env('WEBAPI_BPS_KEY'),
+        'base_url' => env('BPS_API_BASE_URL', 'https://webapi.bps.go.id/v1/api'),
+        'cache_ttl' => (int) env('BPS_CACHE_TTL_HOURS', 24),
+        'timeout' => (int) env('BPS_API_TIMEOUT', 20),
+        'max_retries' => (int) env('BPS_API_MAX_RETRIES', 3),
+    ],
+
 ];

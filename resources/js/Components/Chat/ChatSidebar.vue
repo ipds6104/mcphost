@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Link, router, useForm } from '@inertiajs/vue3';
+import { Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 
 interface Chat {
@@ -103,11 +103,26 @@ const filteredGroupedChats = computed(() => {
 
     return groups;
 });
+
+// State dropdown profil
+const isProfileDropdownOpen = ref(false);
+
+// Mengambil inisial nama (misal: "Ihza Karunia" -> "IK")
+const page = usePage();
+const userInitials = computed(() => {
+    const name = page.props.auth?.user?.name || 'US';
+    return name
+        .split(' ')
+        .map((n) => n[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase();
+});
 </script>
 
 <template>
     <div
-        class="relative flex w-80 shrink-0 select-none flex-col bg-[#f0f4f9] transition-all duration-300 dark:bg-[#0e0e10]"
+        class="relative flex h-full w-80 shrink-0 select-none flex-col bg-[#f0f4f9] transition-all duration-300 dark:bg-[#0e0e10]"
     >
         <!-- Sidebar Brand Header -->
         <div class="flex items-center justify-between px-5 py-4">
@@ -404,6 +419,125 @@ const filteredGroupedChats = computed(() => {
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Bottom Profile & Settings Section -->
+        <div class="border-t border-gray-200/40 p-4 dark:border-gray-800/40">
+            <div class="relative">
+                <!-- Dropdown Trigger (Avatar, Name, & Settings Gear) -->
+                <div
+                    class="flex items-center justify-between rounded-xl p-2 transition-colors duration-200 hover:bg-gray-200/50 dark:hover:bg-[#1e1f20]/40"
+                >
+                    <button
+                        @click="isProfileDropdownOpen = !isProfileDropdownOpen"
+                        class="flex min-w-0 flex-1 items-center gap-3 text-left focus:outline-none"
+                    >
+                        <!-- Gradient Initials Avatar -->
+                        <div
+                            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 text-xs font-bold text-white shadow-sm"
+                        >
+                            {{ userInitials }}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p
+                                class="truncate text-xs font-semibold text-gray-800 dark:text-gray-200"
+                            >
+                                {{ $page.props.auth.user.name }}
+                            </p>
+                            <p
+                                class="truncate text-[10px] text-gray-500 dark:text-gray-400"
+                            >
+                                {{ $page.props.auth.user.email }}
+                            </p>
+                        </div>
+                    </button>
+                    <!-- Settings Trigger Button -->
+                    <button
+                        @click="isProfileDropdownOpen = !isProfileDropdownOpen"
+                        class="rounded-full p-1.5 text-gray-400 transition hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+                        title="Pengaturan & Akun"
+                    >
+                        <svg
+                            class="h-4.5 w-4.5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                            />
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                            />
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Upward Dropdown Menu -->
+                <transition
+                    enter-active-class="transition ease-out duration-100"
+                    enter-from-class="transform opacity-0 scale-95 translate-y-2"
+                    enter-to-class="transform opacity-100 scale-100 translate-y-0"
+                    leave-active-class="transition ease-in duration-75"
+                    leave-from-class="transform opacity-100 scale-100 translate-y-0"
+                    leave-to-class="transform opacity-0 scale-95 translate-y-2"
+                >
+                    <div
+                        v-if="isProfileDropdownOpen"
+                        class="absolute bottom-full left-0 mb-2 w-full origin-bottom-left rounded-xl bg-white p-1.5 shadow-lg ring-1 ring-black/5 focus:outline-none dark:bg-[#1e1f20] dark:ring-white/5"
+                    >
+                        <Link
+                            :href="route('profile.edit')"
+                            class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-gray-700 transition hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-[#2d2e30]"
+                        >
+                            <svg
+                                class="h-4 w-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                                />
+                            </svg>
+                            <span>Pengaturan Profil</span>
+                        </Link>
+                        <div
+                            class="my-1 border-t border-gray-100 dark:border-gray-800"
+                        ></div>
+                        <Link
+                            :href="route('logout')"
+                            method="post"
+                            as="button"
+                            class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-red-600 transition hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/20"
+                        >
+                            <svg
+                                class="h-4 w-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                                />
+                            </svg>
+                            <span>Keluar Sesi</span>
+                        </Link>
+                    </div>
+                </transition>
             </div>
         </div>
     </div>

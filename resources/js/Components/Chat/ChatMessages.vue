@@ -166,26 +166,26 @@ const SparklesIcon = () =>
 
 const suggestionCards = [
     {
-        title: 'Tren Indeks Pembangunan Statistik Sektoral (IPKP) Kabupaten Mempawah tahun ini.',
-        prompt: 'Bagaimana tren Indeks Pembangunan Statistik Sektoral (IPKP) Kabupaten Mempawah tahun ini?',
+        title: 'Tren Indeks Pembangunan Statistik (IPS) Kabupaten Mempawah tahun ini.',
+        prompt: 'Bagaimana tren Indeks Pembangunan Statistik (IPS) Kabupaten Mempawah tahun ini?',
         type: 'Analisis',
         icon: ChartIcon,
     },
     {
-        title: 'Prinsip pemenuhan standar metadata statistik sektoral sesuai Satu Data Indonesia.',
-        prompt: 'Jelaskan prinsip pemenuhan standar metadata statistik sektoral sesuai Satu Data Indonesia.',
+        title: 'Standar metadata Angka Kematian Neonatal Dinas Kesehatan Mempawah.',
+        prompt: 'Bagaimana pemenuhan standar metadata statistik sektoral untuk dataset Angka Kematian Neonatal per 1.000 Kelahiran Hidup dari Dinas Kesehatan Mempawah?',
         type: 'Metadata',
         icon: DatabaseIcon,
     },
     {
-        title: 'Rekomendasi peningkatan nilai EPSS (Evaluasi Penyelenggaraan Statistik Sektoral) Pemkab.',
-        prompt: 'Tolong berikan rekomendasi peningkatan nilai EPSS (Evaluasi Penyelenggaraan Statistik Sektoral) Pemkab.',
+        title: 'Evaluasi pencapaian Standar Pelayanan Minimal (SPM) Kesehatan Mempawah.',
+        prompt: 'Tolong lakukan evaluasi pencapaian Standar Pelayanan Minimal (SPM) Bidang Kesehatan di Kabupaten Mempawah berdasarkan indikator yang ditangani Dinas Kesehatan.',
         type: 'Evaluasi',
         icon: ShieldIcon,
     },
     {
-        title: 'Visualisasikan perbandingan capaian produsen data statistik sektoral tahun 2024.',
-        prompt: 'Visualisasikan perbandingan capaian produsen data statistik sektoral tahun 2024.',
+        title: 'Visualisasikan jumlah pencari kerja terdaftar vs tenaga kerja industri di Mempawah.',
+        prompt: 'Visualisasikan perbandingan Jumlah Pencari Kerja Terdaftar dengan Jumlah Tenaga Kerja Industri di Kabupaten Mempawah.',
         type: 'Visualisasi',
         icon: SparklesIcon,
     },
@@ -232,7 +232,7 @@ onMounted(() => {
                 <p
                     class="mt-3 text-sm font-medium text-gray-500 md:text-base dark:text-gray-400"
                 >
-                    Ada yang bisa saya bantu hari ini untuk mengelola statistik
+                    Ada yang bisa saya bantu hari ini untuk mengelola data dasar & statistik
                     sektoral?
                 </p>
             </div>
@@ -454,7 +454,7 @@ onMounted(() => {
                                     </span>
                                     <span
                                         class="animate-pulse text-[11px] font-bold uppercase tracking-wider"
-                                        >Sedang memproses analisis data sektoral
+                                        >Sedang memproses analisis data dasar & sektoral
                                         (MCP)...</span
                                     >
                                 </div>
@@ -468,6 +468,7 @@ onMounted(() => {
                                 message.agent_steps.length > 0
                             "
                             :steps="message.agent_steps"
+                            :loading="message.is_loading"
                         />
 
                         <!-- Isi Artikel/Dokumen Output -->

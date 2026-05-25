@@ -71,7 +71,7 @@ const createNewChat = () => {
                                 <input
                                     v-model="newChatForm.title"
                                     type="text"
-                                    placeholder="Contoh: Analisis IPKP Kab. Mempawah 2025"
+                                    placeholder="Contoh: Analisis IPS Kab. Mempawah 2025"
                                     class="w-full rounded-lg border border-gray-300 bg-gray-50 px-4 py-3 text-gray-900 transition duration-150 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                                     required
                                 />
@@ -111,7 +111,7 @@ const createNewChat = () => {
                             <p
                                 class="text-sm leading-relaxed text-gray-600 dark:text-gray-300"
                             >
-                                Asisten analitis statistik sektoral Anda untuk
+                                Asisten analitis data dasar & sektoral Anda untuk
                                 koordinasi Pembinaan Statistik Sektoral (PSS)
                                 Kabupaten Mempawah dengan integrasi
                                 <strong>Model Context Protocol (MCP)</strong>.

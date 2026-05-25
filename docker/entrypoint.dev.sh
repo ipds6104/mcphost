@@ -34,6 +34,16 @@ php artisan optimize --quiet 2>/dev/null || true
 echo "[entrypoint] Running database migrations..."
 php artisan migrate --force
 
+# Jalankan seeder secara otomatis hanya jika tabel user masih kosong (fresh database)
+# Hal ini mencegah truncation dari server MCP kustom milik developer jika seeder dijalankan ulang pada kontainer restart.
+USER_COUNT=$(php artisan tinker --execute="echo App\Models\User::count();" 2>/dev/null | grep -o '[0-9]\+' | head -n1) || USER_COUNT=0
+if [ "$USER_COUNT" = "0" ] || [ -z "$USER_COUNT" ]; then
+    echo "[entrypoint] Database appears to be fresh (0 users). Seeding default database records..."
+    php artisan db:seed --force
+else
+    echo "[entrypoint] Database already has data ($USER_COUNT users). Skipping database seeding to preserve custom records."
+fi
+
 # Serahkan kontrol ke command utama
 if [ "$1" = "/init" ] || [ "$1" = "php-fpm-nginx" ]; then
     # Panggil entrypoint bawaan serversideup untuk melakukan rendering config & setup
