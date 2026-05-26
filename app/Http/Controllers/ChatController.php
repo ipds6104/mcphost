@@ -245,4 +245,19 @@ class ChatController extends Controller
 
         return redirect()->back();
     }
+
+    /**
+     * Hentikan/batalkan pemrosesan AI untuk sesi obrolan ini
+     */
+    public function cancel(Chat $chat): RedirectResponse
+    {
+        if ($chat->user_id !== Auth::id()) {
+            abort(403);
+        }
+
+        // Simpan status pembatalan di Cache selama 5 menit
+        \Illuminate\Support\Facades\Cache::put("chat.{$chat->id}.cancelled", true, now()->addMinutes(5));
+
+        return redirect()->back();
+    }
 }

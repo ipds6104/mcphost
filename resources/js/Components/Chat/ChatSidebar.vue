@@ -512,6 +512,25 @@ const userInitials = computed(() => {
                             </svg>
                             <span>Pengaturan Profil</span>
                         </Link>
+                        <Link
+                            :href="route('mcp-servers.index')"
+                            class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-gray-700 transition hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-[#2d2e30]"
+                        >
+                            <svg
+                                class="h-4 w-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                                />
+                            </svg>
+                            <span>Kelola Server MCP</span>
+                        </Link>
                         <div
                             class="my-1 border-t border-gray-100 dark:border-gray-800"
                         ></div>

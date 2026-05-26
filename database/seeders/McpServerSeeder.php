@@ -14,15 +14,15 @@ class McpServerSeeder extends Seeder
      */
     public function run(): void
     {
-        McpServer::truncate();
-
-        McpServer::create([
-            'name' => 'BPS Agentic Docker',
-            'transport' => 'sse',
-            'url' => 'http://host.docker.internal:3001/sse',
-            'token' => 'your_secure_access_token',
-            'is_global' => true,
-            'is_active' => true,
-        ]);
+        McpServer::updateOrCreate(
+            ['name' => 'BPS Agentic Docker'],
+            [
+                'transport' => 'sse',
+                'url' => 'http://bps-mcp-server:3000/sse',
+                'token' => 'your_secure_access_token',
+                'is_global' => true,
+                'is_active' => true,
+            ]
+        );
     }
 }

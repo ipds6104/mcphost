@@ -18,11 +18,94 @@ use Illuminate\Support\Facades\Log;
 class FactGraderService
 {
     /**
-     * Toleransi selisih numerik sebelum override deterministik dilakukan.
-     * Angka dalam teks LLM yang menyimpang melebihi threshold ini akan diganti
-     * dengan nilai resmi dari tool result BPS.
+     * Toleransi dinamis per indikator sebelum override deterministik dilakukan.
      */
-    private const NUMERIC_TOLERANCE = 0.5;
+    protected static function getToleranceForIndicator(string $indicator): float
+    {
+        $indicator = strtoupper(trim($indicator));
+        if (str_contains($indicator, 'GINI')) {
+            return 0.02; // Gini ratio skala 0.0 - 1.0 sangat ketat
+        }
+        if (
+            str_contains($indicator, 'IPM') ||
+            str_contains($indicator, 'TPT') ||
+            str_contains($indicator, 'KEMISKINAN') ||
+            str_contains($indicator, 'MISKIN') ||
+            str_contains($indicator, 'AHH') ||
+            str_contains($indicator, 'RLS') ||
+            str_contains($indicator, 'HLS')
+        ) {
+            return 0.3; // Metrik dasar skala 0 - 100
+        }
+        if (
+            str_contains($indicator, 'PPP') ||
+            str_contains($indicator, 'PDRB') ||
+            str_contains($indicator, 'RATA-RATA PENGELUARAN')
+        ) {
+            return 100.0; // Metrik nominal besar rupiah
+        }
+        return 0.5; // Default fallback
+    }
+
+    /**
+     * Deteksi apakah perubahan YoY di data API BPS merupakan outlier statistik yang tidak masuk akal.
+     */
+    public static function isStatisticalOutlier(string $indicator, float $v1, float $v2): bool
+    {
+        $indicator = strtoupper(trim($indicator));
+        $delta = abs($v2 - $v1);
+
+        if (str_contains($indicator, 'GINI')) {
+            return $delta > 0.08; // Perubahan Gini > 0.08 setahun adalah pencilan
+        }
+        if (str_contains($indicator, 'IPM')) {
+            return $delta > 3.0;  // Perubahan IPM > 3.0 setahun adalah pencilan
+        }
+        if (str_contains($indicator, 'TPT') || str_contains($indicator, 'KEMISKINAN') || str_contains($indicator, 'MISKIN')) {
+            return $delta > 7.0;  // Perubahan Kemiskinan/TPT > 7% setahun adalah pencilan
+        }
+        if (str_contains($indicator, 'AHH')) {
+            return $delta > 2.5;  // Perubahan AHH > 2.5 tahun setahun adalah pencilan
+        }
+        return false;
+    }
+
+    /**
+     * Kamus sinonim nama indikator untuk pencocokan kontekstual.
+     */
+    protected static function getIndicatorSynonyms(string $code): array
+    {
+        $code = strtoupper(trim($code));
+        $map = [
+            'IPM' => ['IPM', 'Indeks Pembangunan Manusia'],
+            'AHH' => ['AHH', 'Angka Harapan Hidup', 'Harapan Hidup'],
+            'RLS' => ['RLS', 'Rata-Rata Lama Sekolah', 'Rata Lama Sekolah'],
+            'HLS' => ['HLS', 'Harapan Lama Sekolah'],
+            'PPP' => ['PPP', 'Pengeluaran Per Kapita', 'Pengeluaran Riil Per Kapita'],
+            'TPT' => ['TPT', 'Tingkat Pengangguran Terbuka', 'Pengangguran'],
+            'KEMISKINAN' => ['Kemiskinan', 'Penduduk Miskin', 'Persentase Penduduk Miskin'],
+            'GINI' => ['Gini', 'Gini Ratio', 'Rasio Gini'],
+        ];
+
+        return $map[$code] ?? [$code];
+    }
+
+    /**
+     * Deteksi kode indikator standar dari nama/judul variabel dynamic table.
+     */
+    protected static function detectIndicatorCode(string $title): ?string
+    {
+        $titleLower = strtolower($title);
+        if (str_contains($titleLower, 'pembangunan manusia') || str_contains($titleLower, 'ipm')) return 'IPM';
+        if (str_contains($titleLower, 'harapan hidup') || str_contains($titleLower, 'ahh')) return 'AHH';
+        if (str_contains($titleLower, 'lama sekolah') && str_contains($titleLower, 'rata')) return 'RLS';
+        if (str_contains($titleLower, 'lama sekolah') && str_contains($titleLower, 'harapan')) return 'HLS';
+        if (str_contains($titleLower, 'pengeluaran per kapita') || str_contains($titleLower, 'ppp')) return 'PPP';
+        if (str_contains($titleLower, 'pengangguran') || str_contains($titleLower, 'tpt')) return 'TPT';
+        if (str_contains($titleLower, 'miskin') || str_contains($titleLower, 'kemiskinan')) return 'KEMISKINAN';
+        if (str_contains($titleLower, 'gini') || str_contains($titleLower, 'rasio gini')) return 'GINI';
+        return null;
+    }
 
     /**
      * Validasi dan selaraskan seluruh draf respons LLM terhadap fakta nyata.
@@ -35,7 +118,7 @@ class FactGraderService
         // ── LAPISAN 1: Postgres Reference Shield ───────────────────────────────
         $content = self::enforcePostgresShield($content);
 
-        // ── LAPISAN 2: Numeric Grounding ────────────────────────────────────────
+        // ── LAPISAN 2: Numeric Grounding & YoY Checks ──────────────────────────
         $content = self::enforceNumericGrounding($content, $steps);
 
         // ── LAPISAN 2.5: Output Shield Interceptor (Short-Circuit Hallucination) ─────────────────────
@@ -111,17 +194,127 @@ class FactGraderService
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    // LAPISAN 2: Numeric Grounding
+    // LAPISAN 2: Agnostic Structured Fact Grounding
     // ──────────────────────────────────────────────────────────────────────────
 
     /**
-     * Bandingkan angka dalam teks LLM terhadap nilai resmi dari tool result BPS.
-     * Jika selisih melebihi NUMERIC_TOLERANCE → override deterministik.
+     * Mengekstrak data numerik terstruktur yang didapatkan asisten dari tool steps.
      *
-     * Strategi: ekstrak pasangan (label, nilai) dari tool steps, lalu cari
-     * pola angka serupa di dalam teks dan koreksi jika menyimpang.
-     *
-     * @param  array  $steps  Tool steps dari ProcessAiAgentQuery
+     * @return array array fakta terstruktur ['indicator', 'synonyms', 'year', 'value', 'regency_code']
+     */
+    public static function extractStructuredFacts(array $steps): array
+    {
+        $facts = [];
+
+        foreach ($steps as $step) {
+            $tool = $step['tool'] ?? '';
+            $args = $step['arguments'] ?? [];
+            $result = $step['result'] ?? [];
+
+            $regencyCode = (string)($args['domain_code'] ?? $args['regency_code'] ?? $args['domain'] ?? '');
+
+            // Kasus A: Laporan regional atau Indikator spesifik dengan tabel terstruktur
+            if (isset($result['table_id']) && isset($result['data']) && is_array($result['data'])) {
+                $indicatorCode = strtoupper(trim((string)$result['table_id']));
+                $synonyms = self::getIndicatorSynonyms($indicatorCode);
+
+                foreach ($result['data'] as $row) {
+                    if (!is_array($row)) {
+                        continue;
+                    }
+
+                    $year = null;
+                    if (isset($row['year'])) {
+                        $year = (int)$row['year'];
+                    } elseif (isset($row['tahun'])) {
+                        $year = (int)$row['tahun'];
+                    }
+
+                    $value = null;
+                    if (isset($row['value']) && is_numeric($row['value'])) {
+                        $value = (float)$row['value'];
+                    } elseif (isset($row['nilai']) && is_numeric($row['nilai'])) {
+                        $value = (float)$row['nilai'];
+                    }
+
+                    if ($year && $value !== null) {
+                        $facts[] = [
+                            'indicator' => $indicatorCode,
+                            'synonyms' => $synonyms,
+                            'year' => $year,
+                            'value' => $value,
+                            'regency_code' => $regencyCode ?: ($result['domain_code'] ?? '')
+                        ];
+                    }
+                }
+            }
+
+            // Kasus B: Data dinamis acak/nested dari BPS API (execute_js / bps_query)
+            self::extractFactsFromGenericData($result, $facts, $regencyCode ?: ($result['domain_code'] ?? ''));
+        }
+
+        return $facts;
+    }
+
+    /**
+     * Rekursif scan untuk mengekstrak data time-series dari response dynamic BPS API.
+     */
+    protected static function extractFactsFromGenericData(mixed $data, array &$facts, string $regencyCode): void
+    {
+        if (!is_array($data)) {
+            return;
+        }
+
+        if (isset($data['datacontent']) && is_array($data['datacontent'])) {
+            $variables = [];
+            if (isset($data['var']) && is_array($data['var'])) {
+                foreach ($data['var'] as $v) {
+                    if (isset($v['var_id'])) {
+                        $variables[$v['var_id']] = $v;
+                    }
+                }
+            }
+
+            foreach ($data['datacontent'] as $key => $val) {
+                // Key format: "varId_turvarId_tahunId_turtahunId_regionCode" atau format time-series
+                if (is_numeric($val)) {
+                    $parts = explode('_', (string)$key);
+                    if (count($parts) >= 3) {
+                        $varId = $parts[0];
+                        $varMeta = $variables[$varId] ?? null;
+                        $varTitle = $varMeta['title'] ?? 'Indikator';
+                        $indicatorCode = self::detectIndicatorCode($varTitle);
+
+                        $year = null;
+                        foreach ($parts as $p) {
+                            if (strlen($p) === 4 && ($p[0] === '2' || $p[0] === '1')) {
+                                $year = (int)$p;
+                            }
+                        }
+
+                        if ($year && $indicatorCode) {
+                            $facts[] = [
+                                'indicator' => $indicatorCode,
+                                'synonyms' => self::getIndicatorSynonyms($indicatorCode),
+                                'year' => $year,
+                                'value' => (float)$val,
+                                'regency_code' => $regencyCode
+                            ];
+                        }
+                    }
+                }
+            }
+        }
+
+        foreach ($data as $key => $val) {
+            if (is_array($val) && $key !== 'var' && $key !== 'period' && $key !== 'vervar') {
+                self::extractFactsFromGenericData($val, $facts, $regencyCode);
+            }
+        }
+    }
+
+    /**
+     * Bandingkan angka desimal dalam teks LLM terhadap nilai resmi yang didapat dari BPS API.
      */
     protected static function enforceNumericGrounding(string $content, array $steps): string
     {
@@ -129,88 +322,126 @@ class FactGraderService
             return $content;
         }
 
-        // Kumpulkan semua angka desimal dari tool results BPS
-        $officialValues = self::extractOfficialValues($steps);
+        $facts = self::extractStructuredFacts($steps);
 
-        if (empty($officialValues)) {
+        if (empty($facts)) {
             return $content;
         }
 
-        foreach ($officialValues as $label => $officialNum) {
-            // Cari pola angka desimal di sekitar kata kunci label dalam teks LLM
-            // Contoh: "IPM Mempawah: 79,13" atau "IPM: 78.5"
-            $escapedLabel = preg_quote($label, '/');
+        foreach ($facts as $fact) {
+            $indicator = $fact['indicator'];
+            $year = $fact['year'];
+            $officialValue = $fact['value'];
+            $regencyCode = $fact['regency_code'];
 
-            $pattern = '/(' . $escapedLabel . '[^0-9]{0,30}?)(\d{2,3}[.,]\d{1,2})/iu';
+            $tolerance = self::getToleranceForIndicator($indicator);
 
-            if (preg_match_all($pattern, $content, $found, PREG_SET_ORDER)) {
-                foreach ($found as $match) {
-                    $detectedStr = $match[2];
-                    $detectedNum = (float) str_replace(',', '.', $detectedStr);
+            $regencyName = '';
+            if (!empty($regencyCode)) {
+                $regency = DB::table('bps_regencies')->where('code', $regencyCode)->first();
+                if ($regency) {
+                    $regencyName = str_replace(['Kabupaten ', 'Kota '], '', $regency->name);
+                }
+            }
 
-                    if (abs($detectedNum - $officialNum) > self::NUMERIC_TOLERANCE) {
-                        $correctedStr = number_format($officialNum, 2, ',', '.');
+            foreach ($fact['synonyms'] as $synonym) {
+                $escapedSynonym = preg_quote($synonym, '/');
+                $escapedYear = preg_quote((string)$year, '/');
 
-                        Log::channel('ai_agent')->warning('fact_grader.numeric_override', [
-                            'label' => $label,
-                            'detected' => $detectedNum,
-                            'official' => $officialNum,
-                            'delta' => abs($detectedNum - $officialNum),
-                            'corrected' => $correctedStr,
-                        ]);
+                $patterns = [];
+                if (!empty($regencyName)) {
+                    $escapedRegency = preg_quote($regencyName, '/');
+                    $patterns[] = '/(' . $escapedSynonym . '.*?'.$escapedRegency.'.*?'.$escapedYear.'.*?)([0-9]+[.,][0-9]+)/iu';
+                    $patterns[] = '/(' . $escapedRegency . '.*?' . $escapedSynonym . '.*?' . $escapedYear . '.*?)([0-9]+[.,][0-9]+)/iu';
+                }
+                $patterns[] = '/(' . $escapedSynonym . '.*?' . $escapedYear . '.*?)([0-9]+[.,][0-9]+)/iu';
+                $patterns[] = '/(' . $escapedYear . '.*?' . $escapedSynonym . '.*?)([0-9]+[.,][0-9]+)/iu';
 
-                        $content = str_replace($match[0], $match[1] . $correctedStr, $content);
+                foreach ($patterns as $pattern) {
+                    if (preg_match_all($pattern, $content, $matches, PREG_SET_ORDER)) {
+                        foreach ($matches as $match) {
+                            $detectedStr = $match[2];
+                            $detectedNum = (float)str_replace(',', '.', $detectedStr);
+
+                            if (abs($detectedNum - $year) < 0.1) {
+                                continue;
+                            }
+
+                            if (abs($detectedNum - $officialValue) > $tolerance) {
+                                // Skip jika PPP nominal besar ditulis pendek / dibulatkan
+                                if ($indicator === 'PPP' && $detectedNum < 1000) {
+                                    continue;
+                                }
+
+                                $correctedStr = number_format($officialValue, 2, ',', '.');
+                                if ($indicator === 'GINI') {
+                                    $correctedStr = number_format($officialValue, 3, ',', '.');
+                                }
+
+                                Log::channel('ai_agent')->warning('fact_grader.numeric_override.agnostic', [
+                                    'indicator' => $indicator,
+                                    'year' => $year,
+                                    'detected' => $detectedNum,
+                                    'official' => $officialValue,
+                                    'corrected' => $correctedStr
+                                ]);
+
+                                $content = str_replace($match[0], $match[1] . $correctedStr, $content);
+                            }
+                        }
                     }
                 }
             }
         }
 
+        // Terapkan YoY & Outlier Sanity Checks
+        $content = self::checkYoYPlausibility($content, $facts);
+
         return $content;
     }
 
     /**
-     * Ekstrak pasangan (nama-indikator => nilai-numerik) dari tool step results.
-     *
-     * @return array<string, float> ['IPM' => 70.13, 'PDRB' => ...]
+     * Memeriksa konsistensi runtun waktu YoY di memori.
      */
-    private static function extractOfficialValues(array $steps): array
+    protected static function checkYoYPlausibility(string $content, array $facts): string
     {
-        $values = [];
-
-        foreach ($steps as $step) {
-            $result = $step['result'] ?? [];
-
-            // Iterasi rekursif mencari angka numerik bermakna dalam tool result
-            self::flattenNumericValues($result, $values);
+        $grouped = [];
+        foreach ($facts as $fact) {
+            $key = $fact['indicator'] . '_' . $fact['regency_code'];
+            $grouped[$key][$fact['year']] = $fact['value'];
         }
 
-        return $values;
-    }
+        foreach ($grouped as $key => $years) {
+            if (count($years) < 2) {
+                continue;
+            }
 
-    /**
-     * Rekursif flatten array tool result untuk mengekstrak angka numerik.
-     *
-     * @param  array<string, float>  &$values  Output reference
-     * @param  string  $prefix  Path prefix untuk key generation
-     */
-    private static function flattenNumericValues(mixed $data, array &$values, string $prefix = ''): void
-    {
-        if (is_array($data)) {
-            foreach ($data as $key => $value) {
-                // Skip metadata dan non-data keys
-                if (in_array($key, ['_meta', 'error', 'source', 'fetched_at', 'cache_status'], true)) {
-                    continue;
+            ksort($years);
+            $yearKeys = array_keys($years);
+
+            for ($i = 1; $i < count($yearKeys); $i++) {
+                $y1 = $yearKeys[$i - 1];
+                $y2 = $yearKeys[$i];
+                $v1 = $years[$y1];
+                $v2 = $years[$y2];
+
+                $parts = explode('_', $key);
+                $indicator = $parts[0];
+
+                if (self::isStatisticalOutlier($indicator, $v1, $v2)) {
+                    Log::channel('ai_agent')->warning('fact_grader.yoy_outlier_detected', [
+                        'indicator' => $indicator,
+                        'year_1' => $y1,
+                        'value_1' => $v1,
+                        'year_2' => $y2,
+                        'value_2' => $v2,
+                        'delta' => abs($v2 - $v1)
+                    ]);
                 }
-
-                $newPrefix = $prefix ? "{$prefix}.{$key}" : (string) $key;
-                self::flattenNumericValues($value, $values, $newPrefix);
-            }
-        } elseif (is_float($data) || (is_int($data) && $data > 0)) {
-            // Hanya simpan nilai yang bermakna secara statistik (0-10000)
-            if ($data > 0 && $data < 10000) {
-                $values[$prefix] = (float) $data;
             }
         }
+
+        return $content;
     }
 
     /**
@@ -236,8 +467,6 @@ class FactGraderService
         }
 
         if ($hasRestricted) {
-            // Jika LLM mencoba mengarang data numerik desimal baru (misal: "70,61" atau "68.91")
-            // kita intersep respons secara penuh demi integritas data BPS.
             if (preg_match('/\b\d{2}[.,]\d{1,2}\b/', $content)) {
                 Log::channel('ai_agent')->warning('fact_grader.output_shield.intercepted_hallucination', [
                     'message' => 'LLM attempted to write statistical decimals under a restricted BPS API key. Intercepting response.',

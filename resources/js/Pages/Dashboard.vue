@@ -111,9 +111,9 @@ const createNewChat = () => {
                             <p
                                 class="text-sm leading-relaxed text-gray-600 dark:text-gray-300"
                             >
-                                Asisten analitis data dasar & sektoral Anda untuk
-                                koordinasi Pembinaan Statistik Sektoral (PSS)
-                                Kabupaten Mempawah dengan integrasi
+                                Asisten analitis data dasar & sektoral Anda
+                                untuk koordinasi Pembinaan Statistik Sektoral
+                                (PSS) Kabupaten Mempawah dengan integrasi
                                 <strong>Model Context Protocol (MCP)</strong>.
                             </p>
                             <div

@@ -22,6 +22,11 @@ class BpsRegencySeeder extends Seeder
                 'province' => 'Kalimantan Barat',
             ],
             [
+                'code' => '5171',
+                'name' => 'Kota Denpasar',
+                'province' => 'Bali',
+            ],
+            [
                 'code' => '6404',
                 'name' => 'Kabupaten Kutai Timur',
                 'province' => 'Kalimantan Timur',

@@ -12,6 +12,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
     (e: 'send', payload: SendPayload): void;
+    (e: 'stop'): void;
 }>();
 
 const content = ref('');
@@ -194,13 +195,26 @@ defineExpose({
                         @keydown="handleKeydown"
                     ></textarea>
 
-                    <!-- Tombol Kirim Bundar Minimalis -->
+                    <!-- Tombol Kirim / Stop Generasi -->
                     <button
+                        v-if="processing"
+                        type="button"
+                        @click="$emit('stop')"
+                        class="shrink-0 self-center rounded-full bg-red-500 p-3 text-white shadow-md transition-all duration-300 hover:scale-105 hover:bg-red-600"
+                        title="Hentikan Generasi"
+                    >
+                        <svg
+                            class="h-4 w-4"
+                            fill="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <rect x="5" y="5" width="14" height="14" rx="1.5" />
+                        </svg>
+                    </button>
+                    <button
+                        v-else
                         type="submit"
-                        :disabled="
-                            processing ||
-                            (!content.trim() && images.length === 0)
-                        "
+                        :disabled="!content.trim() && images.length === 0"
                         :class="[
                             'shrink-0 self-center rounded-full p-3 transition-all duration-300',
                             content.trim() || images.length > 0

@@ -91,6 +91,60 @@ class BpsGroundTruthsSeeder extends Seeder
             ];
         }
 
+        // ── KOTA DENPASAR (5171) & PROVINSI BALI (5100) GROUND TRUTHS ───────────────────────
+        $denpasarBaliGroundTruths = [
+            // Kota Denpasar (5171)
+            [
+                'domain_code' => '5171',
+                'year' => 2025,
+                'indicator_code' => 'AHH',
+                'value' => 76.16,
+                'notes' => 'Angka Harapan Hidup Kota Denpasar 2025 (Ground Truth)',
+            ],
+            [
+                'domain_code' => '5171',
+                'year' => 2024,
+                'indicator_code' => 'AHH',
+                'value' => 75.80,
+                'notes' => 'Angka Harapan Hidup Kota Denpasar 2024 (Ground Truth)',
+            ],
+            [
+                'domain_code' => '5171',
+                'year' => 2025,
+                'indicator_code' => 'IPM',
+                'value' => 85.63,
+                'notes' => 'IPM Kota Denpasar 2025 (Ground Truth)',
+            ],
+            [
+                'domain_code' => '5171',
+                'year' => 2024,
+                'indicator_code' => 'IPM',
+                'value' => 85.11,
+                'notes' => 'IPM Kota Denpasar 2024 (Ground Truth)',
+            ],
+            // Provinsi Bali (5100)
+            [
+                'domain_code' => '5100',
+                'year' => 2025,
+                'indicator_code' => 'IPM',
+                'value' => 79.37,
+                'notes' => 'IPM Provinsi Bali 2025 (Ground Truth)',
+            ],
+        ];
+
+        foreach ($denpasarBaliGroundTruths as $gt) {
+            $records[] = [
+                'id' => Str::uuid()->toString(),
+                'domain_code' => $gt['domain_code'],
+                'year' => $gt['year'],
+                'indicator_code' => $gt['indicator_code'],
+                'value' => $gt['value'],
+                'notes' => $gt['notes'],
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+
         // Simpan semua ke database
         foreach ($records as $record) {
             DB::table('bps_ground_truths')->updateOrInsert(
@@ -104,3 +158,4 @@ class BpsGroundTruthsSeeder extends Seeder
         }
     }
 }
+

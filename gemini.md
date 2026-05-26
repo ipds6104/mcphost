@@ -95,11 +95,14 @@ Setiap pengembangan lanjutan wajib mematuhi aturan ketat di bawah ini tanpa komp
 8.  **Strict Bun Runtime Directive (Mei 2026):**
     *   Seluruh perintah runtime frontend, instalasi dependensi, linting (`bun run lint`), dan eksekusi skrip wajib menggunakan **Bun** (`bun`, `bun run`, `bunx`).
     *   Sama sekali **dilarang** menggunakan Node.js, npm, atau npx untuk perintah-perintah pengembangan harian.
+9.  **CodeGraph Semantic Indexing (Mei 2026):**
+    *   Basis kode ini dilengkapi indeks graf semantik CodeGraph lokal di `/.codegraph/`.
+    *   Setiap kali melakukan penelusuran kode, mencari dependensi/pemanggil (*callers*), menganalisis dampak pengeditan (*impact analysis*), atau merancang fitur baru, asisten AI (Antigravity/Claude Code/Cursor) **wajib menggunakan kueri CodeGraph** (seperti `codegraph query`, `codegraph callers`, `codegraph impact`) daripada melakukan recursive grep manual guna mempercepat penelusuran dan menjaga efisiensi token konteks.
 
 
 ---
 
-*Terakhir diperbarui: 22 Mei 2026 oleh Antigravity AI*
+*Terakhir diperbarui: 26 Mei 2026 oleh Antigravity AI*
 
 ---
 
@@ -417,4 +420,13 @@ Database lokal `bps_ground_truths` dan warm cache `bps_api_cache` harus dipeliha
         *   **Robust Shell Execution (\`set +e\` / \`set -e\` blocks):** Memodifikasi [entrypoint.dev.sh](file:///wsl.localhost/Ubuntu/home/dmin/projects/mcphost/docker/entrypoint.dev.sh) untuk menonaktifkan sementara mode abort-on-error (\`set +e\`) saat melakukan pipeline query database \`User::count()\`. Hal ini mencegah subshell assignment pipeline (yang melempar exception QueryError karena tabel \`users\` belum ter-migrasi) men-crash paksa skrip entrypoint.
         *   **Auto-Seeding Restoration:** Menjamin seeder default (\`db:seed\`) berjalan dengan sukses 100% saat database benar-benar kosong, menyelesaikan isu error *"These credentials do not match our records"* untuk user \`ihzakarunia@bps.go.id\` pada lingkungan pengembangan lokal.
         *   **Keamanan Produksi:** Perubahan ini 100% aman karena hanya berdampak pada lingkungan pengembangan lokal (\`entrypoint.dev.sh\`), sehingga di lingkungan produksi (yang dikelola CI/CD melalui \`entrypoint.sh\` standar) data persisten Anda dijamin 100% aman tanpa risiko tertimpa/terhapus.
+
+*   **26 Mei 2026:** 📊 **Instalasi dan Inisialisasi CodeGraph untuk Efisiensi Pencarian Kode.**
+    *   *Deskripsi:* Mengintegrasikan alat pencarian semantik CodeGraph (`@colbymchenry/codegraph`) ke dalam basis kode proyek untuk mempercepat penelusuran kode, mengurangi penggunaan token konteks asisten AI, dan memberikan navigasi graf simbol yang instan.
+    *   *Pencapaian:*
+        *   *Inisialisasi Graf:* Berhasil melakukan `codegraph init -i` untuk memetakan seluruh basis kode. Mengindeks 179 berkas, menghasilkan 1.326 simpul (nodes) reaktif (termasuk 35 Laravel Route, 69 Classes, 203 Methods, dan 33 Vue Components), serta 2.433 relasi pemanggilan (edges).
+        *   *Keamanan Git:* Menambahkan pengecualian direktori `/.codegraph/` ke dalam berkas `.gitignore` untuk mencegah pelacakan database SQLite graf lokal di Git.
+        *   *Penyusunan Aturan Kepatuhan AI:* Membuat berkas `CLAUDE.md` terpadu dan mengintegrasikannya dengan memori taktis asisten AI untuk memprioritaskan kueri semantik CodeGraph sebelum melakukan recursive grep di basis kode.
+        *   *Verifikasi Status:* Menjalankan perintah audit status (`codegraph status`) dan memastikan graf berjalan 100% mutakhir dengan mode sinkronisasi inkremental otomatis.
+
 

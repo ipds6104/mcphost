@@ -16,8 +16,12 @@ echo "🤖 TEST MCP SSE CLIENT - STANDALONE VALIDATION\n";
 echo "========================================================================\n\n";
 
 $client = new McpSseClient();
-$sseUrl = 'http://host.docker.internal:3001/sse';
-$token = 'your_secure_access_token';
+$mcpServer = App\Models\McpServer::where('name', 'BPS Agentic Docker')->first();
+if (!$mcpServer) {
+    throw new \Exception("Server MCP 'BPS Agentic Docker' tidak ditemukan di database. Pastikan Anda sudah menjalankan seeder!");
+}
+$sseUrl = $mcpServer->url;
+$token = $mcpServer->token;
 
 try {
     echo "1. Handshaking and Listing Tools from: {$sseUrl}...\n";

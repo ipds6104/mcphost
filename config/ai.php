@@ -123,7 +123,7 @@ return [
         ],
 
         'openai' => [
-            'driver' => 'openai',
+            'driver' => 'deepseek',
             'key' => env('OPENAI_API_KEY'),
             'url' => env('OPENAI_URL', 'https://api.openai.com/v1'),
             'model' => env('AI_MODEL', 'gemini-3-flash'),

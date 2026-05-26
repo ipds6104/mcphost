@@ -487,6 +487,37 @@ const handleNewChat = () => {
     router.visit(route('dashboard'));
 };
 
+// Hentikan/batalkan proses berpikir AI
+const handleStop = () => {
+    if (!props.currentChat) return;
+
+    console.log(
+        `⏹️ [Chat] Stop generation requested for Chat ID: ${props.currentChat.id}`,
+    );
+
+    isAiProcessing.value = false;
+    activeAgentSteps.value = [];
+
+    const loadingIdx = localMessages.value.findIndex(
+        (m) => m.id === 'temp-loader',
+    );
+    if (loadingIdx !== -1) {
+        localMessages.value.splice(loadingIdx, 1);
+    }
+
+    router.post(
+        route('chats.cancel', props.currentChat.id),
+        {},
+        {
+            onFinish: () => {
+                console.log(
+                    '⏹️ [Chat] Backend generation cancellation request sent.',
+                );
+            },
+        },
+    );
+};
+
 onUnmounted(() => {
     // Revoke seluruh Object URL yang dialokasikan di memori browser (Pencegahan kebocoran memori level senior)
     objectUrls.value.forEach((url) => URL.revokeObjectURL(url));
@@ -589,8 +620,9 @@ onUnmounted(() => {
                 >
                     <ChatInput
                         ref="chatInputRef"
-                        :processing="form.processing"
+                        :processing="isAiProcessing"
                         @send="handleSend"
+                        @stop="handleStop"
                     />
                 </div>
             </div>

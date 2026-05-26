@@ -54,7 +54,9 @@ const toggleStepDetail = (stepIndex: number) => {
 const areAllStepsExpanded = computed(() => {
     const stepsWithResult = normalizedSteps.value.filter((s) => s.result);
     if (stepsWithResult.length === 0) return false;
-    return normalizedSteps.value.every((s, idx) => !s.result || expandedStepIds.value[idx]);
+    return normalizedSteps.value.every(
+        (s, idx) => !s.result || expandedStepIds.value[idx],
+    );
 });
 
 const toggleExpandAll = () => {
@@ -153,7 +155,10 @@ const getStepMetadata = (step: AgentStep) => {
                     ></span>
                 </span>
                 <!-- Success green check -->
-                <span v-else class="shrink-0 text-green-500 dark:text-green-400">
+                <span
+                    v-else
+                    class="shrink-0 text-green-500 dark:text-green-400"
+                >
                     <svg
                         class="h-3.5 w-3.5"
                         fill="none"
@@ -198,7 +203,7 @@ const getStepMetadata = (step: AgentStep) => {
 
             <!-- Expand/Collapse All Details Button -->
             <button
-                v-if="isExpanded && steps.some(s => s.result)"
+                v-if="isExpanded && steps.some((s) => s.result)"
                 @click.stop="toggleExpandAll"
                 class="inline-flex items-center gap-1 rounded-full border border-gray-200/30 bg-gray-100/50 px-2.5 py-1.5 font-medium text-gray-400 transition duration-200 hover:bg-gray-200/85 hover:text-gray-700 dark:border-gray-700/30 dark:bg-[#1e1f20]/40 dark:text-gray-400 dark:hover:bg-[#1e1f20] dark:hover:text-gray-200"
             >
@@ -212,10 +217,18 @@ const getStepMetadata = (step: AgentStep) => {
                         stroke-linecap="round"
                         stroke-linejoin="round"
                         stroke-width="2"
-                        :d="areAllStepsExpanded ? 'M5 15l7-7 7 7' : 'M19 9l-7 7-7-7'"
+                        :d="
+                            areAllStepsExpanded
+                                ? 'M5 15l7-7 7 7'
+                                : 'M19 9l-7 7-7-7'
+                        "
                     />
                 </svg>
-                <span class="tracking-wide">{{ areAllStepsExpanded ? 'Collapse All Details' : 'Expand All Details' }}</span>
+                <span class="tracking-wide">{{
+                    areAllStepsExpanded
+                        ? 'Collapse All Details'
+                        : 'Expand All Details'
+                }}</span>
             </button>
         </div>
 
@@ -342,9 +355,7 @@ const getStepMetadata = (step: AgentStep) => {
                                 v-if="step.result"
                                 :class="[
                                     'h-3 w-3 shrink-0 transition-transform duration-200',
-                                    expandedStepIds[sIdx]
-                                        ? 'rotate-180'
-                                        : '',
+                                    expandedStepIds[sIdx] ? 'rotate-180' : '',
                                 ]"
                                 fill="none"
                                 stroke="currentColor"

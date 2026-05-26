@@ -15,7 +15,10 @@ echo -e "${BLUE}==================================================${NC}"
 echo -e "${BLUE}     MCPHost Gateway - Dockerized Local Dev       ${NC}"
 echo -e "${BLUE}==================================================${NC}"
 
-# Jalankan docker-compose build & up
+# Pastikan jaringan bersama mcp-network sudah dibuat
+docker network create mcp-network 2>/dev/null || true
+
+# Jalankan docker-compose build & up dengan pembersihan kontainer yatim (orphans)
 echo -e "${GREEN}Memulai seluruh service development di dalam Docker...${NC}"
 echo -e "${BLUE}Daftar Port & Layanan yang Terbuka:${NC}"
 echo -e "  - 🌐 Web Server Utama (Nginx & PHP-FPM) : ${GREEN}http://127.0.0.1:8900${NC}"
@@ -24,4 +27,4 @@ echo -e "  - 📡 Laravel Reverb (WebSockets)          : ${GREEN}ws://127.0.0.1:
 echo -e "  - 🐘 PostgreSQL Database Server           : ${GREEN}localhost:54322${NC} (DB: mcphost, User: mcphost)"
 echo -e "  - 🔴 Redis Cache & Queue Server          : ${GREEN}localhost:63792${NC}"
 echo -e ""
-docker compose up --build
+docker compose up --build --remove-orphans

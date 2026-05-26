@@ -232,8 +232,8 @@ onMounted(() => {
                 <p
                     class="mt-3 text-sm font-medium text-gray-500 md:text-base dark:text-gray-400"
                 >
-                    Ada yang bisa saya bantu hari ini untuk mengelola data dasar & statistik
-                    sektoral?
+                    Ada yang bisa saya bantu hari ini untuk mengelola data dasar
+                    & statistik sektoral?
                 </p>
             </div>
 
@@ -454,8 +454,8 @@ onMounted(() => {
                                     </span>
                                     <span
                                         class="animate-pulse text-[11px] font-bold uppercase tracking-wider"
-                                        >Sedang memproses analisis data dasar & sektoral
-                                        (MCP)...</span
+                                        >Sedang memproses analisis data dasar &
+                                        sektoral (MCP)...</span
                                     >
                                 </div>
                             </div>

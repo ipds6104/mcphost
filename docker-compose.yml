@@ -180,3 +180,8 @@ services:
 volumes:
   mcphost-db-data:
   mcphost-redis-data:
+
+networks:
+  default:
+    name: mcp-network
+    external: true

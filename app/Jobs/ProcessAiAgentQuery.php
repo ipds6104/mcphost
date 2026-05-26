@@ -10,11 +10,16 @@ use App\Events\AgentResponseGenerated;
 use App\Exceptions\OffTopicQueryException;
 use App\Exceptions\SecurityException;
 use App\Models\Message;
+use App\Models\ToolExecutionHeuristic;
+use App\Models\AgnosticTrajectoryMemory;
 use App\Services\BpsApiService;
 use App\Services\DisclaimerInjectorService;
 use App\Services\FactGraderService;
 use App\Services\LlmInputValidator;
+use App\Services\McpSseClient;
 use App\Services\MethodologyRegistryService;
+use App\Services\HybridTokenizerService;
+use App\Services\AgnosticGraderService;
 use Cortex\JsonRepair\JsonRepairer;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -32,7 +37,14 @@ class ProcessAiAgentQuery implements ShouldQueue
      *
      * @var int
      */
-    public $timeout = 60;
+    public $timeout = 180;
+
+    /**
+     * Jumlah percobaan eksekusi job sebelum dianggap gagal permanen (mencegah retry loop).
+     *
+     * @var int
+     */
+    public $tries = 1;
 
     /**
      * Create a new job instance.
@@ -179,38 +191,112 @@ class ProcessAiAgentQuery implements ShouldQueue
             $msg->content
         ))->all();
 
-        // ── 2. Inisialisasi BPS API Tools (Real API, bukan mock) ─────────────
+        // ── 2. Inisialisasi Perkakas AI (Real API & Dynamic MCP Servers) ─────────────
         $state = (object) ['stepIndex' => 0, 'steps' => []];
         $tools = [];
-        $bpsService = new BpsApiService((string) config('services.bps.key', ''));
 
-        $bpsToolDefinitions = [
-            [
-                'name' => 'fetch_regional_report',
-                'description' => 'Mengambil daftar tabel statistik resmi BPS untuk suatu kabupaten/kota berdasarkan kode domain BPS (data real-time dari webapi.bps.go.id).',
-            ],
-            [
-                'name' => 'get_bps_indicator',
-                'description' => 'Mengambil data dari tabel statistik BPS tertentu untuk suatu wilayah (data real-time dari webapi.bps.go.id).',
-            ],
-            [
-                'name' => 'compare_regencies',
-                'description' => 'Membandingkan data statistik BPS antar beberapa kabupaten/kota secara paralel (data real-time dari webapi.bps.go.id).',
-            ],
-            [
-                'name' => 'search_statistics',
-                'description' => 'Mencari variabel dan indikator statistik BPS berdasarkan kata kunci untuk suatu wilayah (data real-time dari webapi.bps.go.id).',
-            ],
-        ];
+        $chat = \App\Models\Chat::find($this->chatId);
+        $user = $chat?->user;
+        $disableBuiltin = $user?->disable_builtin_mcp ?? false;
 
-        foreach ($bpsToolDefinitions as $toolDef) {
-            $tools[] = new BpsApiTool(
-                toolName: $toolDef['name'],
-                toolDescription: $toolDef['description'],
-                bpsService: $bpsService,
-                chatId: $this->chatId,
-                state: $state
-            );
+        // A. Muat Built-in BPS API Tools jika tidak dinonaktifkan
+        if (! $disableBuiltin) {
+            $bpsService = new BpsApiService((string) config('services.bps.key', ''));
+
+            $bpsToolDefinitions = [
+                [
+                    'name' => 'fetch_regional_report',
+                    'description' => 'Mengambil daftar tabel statistik resmi BPS untuk suatu kabupaten/kota berdasarkan kode domain BPS (data real-time dari webapi.bps.go.id).',
+                ],
+                [
+                    'name' => 'get_bps_indicator',
+                    'description' => 'Mengambil data dari tabel statistik BPS tertentu untuk suatu wilayah (data real-time dari webapi.bps.go.id).',
+                ],
+                [
+                    'name' => 'compare_regencies',
+                    'description' => 'Membandingkan data statistik BPS antar beberapa kabupaten/kota secara paralel (data real-time dari webapi.bps.go.id).',
+                ],
+                [
+                    'name' => 'search_statistics',
+                    'description' => 'Mencari variabel dan indikator statistik BPS berdasarkan kata kunci untuk suatu wilayah (data real-time dari webapi.bps.go.id).',
+                ],
+            ];
+
+            foreach ($bpsToolDefinitions as $toolDef) {
+                // Filter built-in tools yang lambat & redundan dibanding execute_js
+                if (in_array($toolDef['name'], ['search_statistics', 'get_bps_indicator'])) {
+                    continue;
+                }
+
+                $tools[] = new BpsApiTool(
+                    toolName: $toolDef['name'],
+                    toolDescription: $toolDef['description'],
+                    bpsService: $bpsService,
+                    chatId: $this->chatId,
+                    state: $state
+                );
+            }
+
+            Log::channel('ai_agent')->info('ai_agent.builtin_tools_loaded', [
+                'trace_id' => $traceId,
+                'chat_id' => $this->chatId,
+                'count' => count($tools),
+            ]);
+        } else {
+            Log::channel('ai_agent')->info('ai_agent.builtin_tools_disabled', [
+                'trace_id' => $traceId,
+                'chat_id' => $this->chatId,
+            ]);
+        }
+
+        // B. Muat Dynamic MCP Servers secara dinamis menggunakan McpSseClient & McpSseTool
+        try {
+            $activeServers = \App\Models\McpServer::where('is_active', true)->get();
+            $sseClient = new McpSseClient();
+
+            foreach ($activeServers as $server) {
+                Log::channel('ai_agent')->info("Memuat perkakas secara dinamis dari Server MCP: {$server->name} ({$server->url})");
+
+                try {
+                    $mcpTools = $sseClient->listTools($server->url, $server->token);
+
+                    foreach ($mcpTools as $mcpTool) {
+                        // Filter seluruh discovery & data fetching redundan
+                        // untuk memaksa LLM menggunakan execute_js secara langsung (Zero-Discovery).
+                        $forbiddenMcpTools = [
+                            'bps_query',
+                            'bps_get_indicator_map',
+                            'bps_list_variable',
+                            'bps_list_period',
+                            'bps_list_vertical_var',
+                            'bps_get_dynamic_data'
+                        ];
+
+                        if (in_array($mcpTool['name'], $forbiddenMcpTools)) {
+                            continue;
+                        }
+
+                        $tools[] = new \App\Ai\Tools\McpSseTool(
+                            toolName: $mcpTool['name'],
+                            toolDescription: $mcpTool['description'] ?? 'Perkakas eksternal dari ' . $server->name,
+                            rawSchema: $mcpTool['inputSchema'] ?? [],
+                            serverUrl: $server->url,
+                            serverToken: $server->token,
+                            sseClient: $sseClient,
+                            chatId: $this->chatId,
+                            state: $state
+                        );
+                    }
+
+                    $filteredCount = count(array_filter($mcpTools, fn($t) => $t['name'] !== 'bps_query'));
+                    Log::channel('ai_agent')->info("Berhasil memuat {$filteredCount} perkakas dari server MCP: {$server->name} (bps_query dinonaktifkan)");
+                } catch (\Exception $serverEx) {
+                    Log::channel('ai_agent')->error("Gagal mengambil daftar perkakas dari Server MCP {$server->name}: " . $serverEx->getMessage());
+                }
+            }
+
+        } catch (\Exception $globalMcpEx) {
+            Log::channel('ai_agent')->error('Gagal memproses pemuatan Server MCP Dinamis: ' . $globalMcpEx->getMessage());
         }
 
         Log::channel('ai_agent')->debug('ai_agent.bps_tools_ready', [
@@ -235,6 +321,19 @@ class ProcessAiAgentQuery implements ShouldQueue
         // ── 4. Jalankan LLM — selalu gunakan AI nyata jika API key ada ───
         $assistantContent = '';
 
+        // Check if generation is cancelled before starting
+        if (\Illuminate\Support\Facades\Cache::has("chat.{$this->chatId}.cancelled")) {
+            Log::channel('ai_agent')->info('ai_agent.generation_aborted_early', [
+                'chat_id' => $this->chatId,
+            ]);
+            \Illuminate\Support\Facades\Cache::forget("chat.{$this->chatId}.cancelled");
+
+            return;
+        }
+
+        $normalizedIntent = strtolower($userMessage->content);
+        $appliedHeuristicIds = [];
+
         if (! $providerKey) {
             // Tidak ada API key sama sekali — beri respons informatif
             $assistantContent = implode("\n\n", [
@@ -246,6 +345,89 @@ class ProcessAiAgentQuery implements ShouldQueue
             ]);
         } else {
             try {
+                // ── 3.5. Tokenisasi Hibrida & Injeksi Memori/Heuristik (Fase 2 + 3) ──
+                $tokenizer = new HybridTokenizerService();
+                $tokens = $tokenizer->tokenize($userMessage->content);
+                $normalizedIntent = strtolower($userMessage->content);
+                
+                // Gunakan Laravel 13 Concurrency untuk Pre-Flight Paralel
+                $concurrentResults = \Illuminate\Support\Facades\Concurrency::run([
+                    // 1. Task: Cek Heuristik Aktif
+                    function () use ($tokens) {
+                        $hints = [];
+                        $appliedIds = [];
+                        if (!empty($tokens)) {
+                            $activeHeuristics = \App\Models\ToolExecutionHeuristic::where('is_active', true)->get();
+                            foreach ($activeHeuristics as $heuristic) {
+                                $matches = true;
+                                foreach ($heuristic->parameter_pattern as $paramKey => $expectedToken) {
+                                    if (!isset($tokens[$expectedToken])) {
+                                        $matches = false;
+                                        break;
+                                    }
+                                }
+                                if ($matches) {
+                                    $instruction = $heuristic->rewrite_instruction['instruction'] ?? '';
+                                    foreach ($tokens as $tokenKey => $tokenVal) {
+                                        $instruction = str_replace($tokenKey, (string)$tokenVal, $instruction);
+                                    }
+                                    $hints[] = "- **Aturan Pemulihan [ID: {$heuristic->id}]:** " . $instruction;
+                                    $appliedIds[] = $heuristic->id;
+                                }
+                            }
+                        }
+                        return ['hints' => $hints, 'applied_ids' => $appliedIds];
+                    },
+                    // 2. Task: Cek Lintasan Memori Teruji
+                    function () use ($tokens, $normalizedIntent) {
+                        $hints = [];
+                        if (!empty($tokens)) {
+                            if (isset($tokens['REGION_NAME'])) {
+                                $normalizedIntent = str_replace(strtolower($tokens['REGION_NAME']), 'REGION_NAME', $normalizedIntent);
+                            }
+                            if (isset($tokens['YEAR_TOKEN'])) {
+                                $normalizedIntent = str_replace($tokens['YEAR_TOKEN'], 'YEAR_TOKEN', $normalizedIntent);
+                            }
+                            $matchedTrajectory = \App\Models\AgnosticTrajectoryMemory::where('intent_pattern', $normalizedIntent)
+                                ->where('score', '>=', 90.0)
+                                ->first();
+                                
+                            if ($matchedTrajectory) {
+                                $matchedTrajectory->increment('use_count');
+                                $matchedTrajectory->updateQuietly(['last_used_at' => now()]);
+                                $executionHint = "Ditemukan JALUR EKSEKUSI TERUJI untuk kueri terabstraksi ini:\n";
+                                foreach ($matchedTrajectory->successful_execution_graph as $idx => $graphStep) {
+                                    $executionHint .= "   " . ($idx + 1) . ". Panggil perkakas `" . ($graphStep['tool'] ?? 'unknown') . "` dengan parameter optimal.\n";
+                                }
+                                $executionHint .= "   Panggil langsung perkakas-perkakas ini secara paralel untuk meminimalkan durasi eksekusi.";
+                                $hints[] = "- **Rute Pintas Lintasan Memori:** " . $executionHint;
+                            }
+                        }
+                        return ['hints' => $hints, 'normalized_intent' => $normalizedIntent];
+                    },
+                    // 3. Task: Cognitive Injection (BPS Indicator Map)
+                    function () use ($tokens) {
+                        if (isset($tokens['SUB_REGION_CODE']) && isset($tokens['REGION_NAME'])) {
+                            $service = new \App\Services\BpsIndicatorMapService();
+                            return $service->buildInjectionAddendum($tokens['SUB_REGION_CODE'], $tokens['REGION_NAME']);
+                        }
+                        return '';
+                    }
+                ]);
+
+                $cognitiveHints = array_merge($concurrentResults[0]['hints'], $concurrentResults[1]['hints']);
+                $appliedHeuristicIds = $concurrentResults[0]['applied_ids'];
+                $normalizedIntent = $concurrentResults[1]['normalized_intent'] ?? $normalizedIntent;
+                $indicatorMapAddendum = $concurrentResults[2] ?? '';
+
+                $instructionsAddendum = "";
+                if (!empty($cognitiveHints)) {
+                    $instructionsAddendum = "\n\n# MEMORI & HEURISTIK KOGNITIF TERKOREKSI (IKUTI ATURAN INI)\n" . implode("\n", $cognitiveHints);
+                }
+                if (!empty($indicatorMapAddendum)) {
+                    $instructionsAddendum .= $indicatorMapAddendum;
+                }
+
                 $agent = new GovtAnalyticsAgent(
                     instructions: implode("\n", [
                         '# IDENTITAS & PERAN',
@@ -330,7 +512,7 @@ class ProcessAiAgentQuery implements ShouldQueue
                         '- Gunakan tabel Markdown GFM (pipe | dan tanda hubung -) untuk data tabular.',
                         '- Gunakan heading ## dan ### untuk struktur laporan yang jelas.',
                         '- Sertakan kesimpulan strategis dan rekomendasi kebijakan di akhir laporan.',
-                    ]),
+                    ]) . $instructionsAddendum,
                     tools: $tools,
                     messages: $aiMessages
                 );
@@ -341,6 +523,17 @@ class ProcessAiAgentQuery implements ShouldQueue
                 $assistantContent = '';
 
                 while ($attempts < $maxAttempts) {
+                    // Check if generation is cancelled inside the loop
+                    if (\Illuminate\Support\Facades\Cache::has("chat.{$this->chatId}.cancelled")) {
+                        Log::channel('ai_agent')->info('ai_agent.generation_aborted_loop', [
+                            'chat_id' => $this->chatId,
+                            'attempt' => $attempts,
+                        ]);
+                        \Illuminate\Support\Facades\Cache::forget("chat.{$this->chatId}.cancelled");
+
+                        return;
+                    }
+
                     $response = $agent->prompt(
                         prompt: $currentPrompt,
                         attachments: $attachments,
@@ -414,6 +607,16 @@ class ProcessAiAgentQuery implements ShouldQueue
             }
         }
 
+        // Check if generation is cancelled before parsing and saving
+        if (\Illuminate\Support\Facades\Cache::has("chat.{$this->chatId}.cancelled")) {
+            Log::channel('ai_agent')->info('ai_agent.generation_aborted_before_save', [
+                'chat_id' => $this->chatId,
+            ]);
+            \Illuminate\Support\Facades\Cache::forget("chat.{$this->chatId}.cancelled");
+
+            return;
+        }
+
         // ── 5. Parsing chart data dari markdown output LLM ───────────────
         $chartData = $this->parseChartData($assistantContent);
 
@@ -428,6 +631,61 @@ class ProcessAiAgentQuery implements ShouldQueue
 
         // ── 7. Broadcast respons final via Laravel Reverb WebSocket ───────
         event(new AgentResponseGenerated($this->chatId, $assistantMessage->id, $assistantContent, $chartData));
+
+        // ── 8. Penilai Otonom & Penguatan Reinforcement Loop (Fase 2) ──
+        try {
+            $grader = new AgnosticGraderService();
+            // Lakukan penilaian berdasarkan kumpulan steps eksekusi dan kueri asli
+            $score = $grader->gradeResponse($state->steps, $userMessage->content);
+
+            $durationSec = round((hrtime(true) - $startedAt) / 1_000_000_000, 2);
+
+            Log::channel('ai_agent')->info('ai_agent.autonomous_grading', [
+                'trace_id' => $traceId,
+                'score' => $score,
+                'steps_count' => count($state->steps),
+                'applied_heuristics' => $appliedHeuristicIds,
+            ]);
+
+            // Pemicu Penalti Peluruhan (Decay) pada Heuristik yang Diterapkan
+            if (!empty($appliedHeuristicIds)) {
+                $heuristics = ToolExecutionHeuristic::whereIn('id', $appliedHeuristicIds)->get();
+                foreach ($heuristics as $h) {
+                    // Konsekuensi Skor Netral (50.0) memperkuat taktik (increment success_count) tapi tidak memicu penalti
+                    $isSuccess = $score >= 50.0;
+                    $grader->applyDecay($h, $isSuccess);
+                }
+            }
+
+            // Simpan Lintasan ke Memori jika Lulus Sempurna (Skor 100.0)
+            if ($score >= 100.0 && count($state->steps) > 0) {
+                // Bangun execution graph terabstraksi
+                $executionGraph = [];
+                foreach ($state->steps as $step) {
+                    $executionGraph[] = [
+                        'tool' => $step['tool'] ?? '',
+                        'parameters' => $step['parameters'] ?? [],
+                    ];
+                }
+
+                // Simpan atau perbarui memori lintasan agnostik
+                AgnosticTrajectoryMemory::updateOrCreate(
+                    ['intent_pattern' => $normalizedIntent],
+                    [
+                        'successful_execution_graph' => $executionGraph,
+                        'applied_heuristic_ids' => $appliedHeuristicIds,
+                        'score' => $score,
+                        'duration' => $durationSec,
+                        'last_used_at' => now(),
+                    ]
+                );
+            }
+        } catch (\Exception $gradingEx) {
+            Log::channel('ai_agent')->error('ai_agent.grading_failed', [
+                'trace_id' => $traceId,
+                'error' => $gradingEx->getMessage(),
+            ]);
+        }
 
         // ┌──────────────────────────────────────────────────────────┐
         // │  TRACE COMPLETE — Catat durasi total & ringkasan hasil  │

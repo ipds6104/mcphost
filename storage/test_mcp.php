@@ -7,8 +7,12 @@ $kernel->bootstrap();
 
 $start = microtime(true);
 $client = new App\Services\McpSseClient();
+$mcpServer = App\Models\McpServer::where('name', 'BPS Agentic Docker')->first();
+if (!$mcpServer) {
+    throw new \Exception("Server MCP 'BPS Agentic Docker' tidak ditemukan di database.");
+}
 try {
-  $tools = $client->listTools('http://host.docker.internal:3001/sse', 'your_secure_access_token');
+  $tools = $client->listTools($mcpServer->url, $mcpServer->token);
   echo 'Success: ' . count($tools) . " tools found.\n";
 } catch (\Exception $e) {
   echo 'Error: ' . $e->getMessage() . "\n";
