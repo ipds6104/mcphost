@@ -78,7 +78,7 @@ class AgnosticGraderService
         ];
         
         // 3. Terapkan Formula Peluruhan (Grace Period = 10 Eksekusi)
-        if ($totalExecutions >= 10) {
+        if (!$heuristic->is_system && $totalExecutions >= 10) {
             $failureRate = $heuristic->failure_count / $totalExecutions;
             if ($failureRate > 0.40) {
                 $updates['is_active'] = false; // Tandai tidak aktif secara otonom

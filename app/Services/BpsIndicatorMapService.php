@@ -77,10 +77,25 @@ class BpsIndicatorMapService
      */
     public function buildInjectionAddendum(string $domainCode, string $regionName): string
     {
+        $discoveryAddendum = "\n\n## 🚨 ATURAN DISCOVERY WAJIB UNTUK WILAYAH BARU (IKUTI DENGAN KETAT):\n" .
+            "Jika Anda tidak menemukan indikator pembangunan yang terverifikasi untuk wilayah target, Anda harus melakukan pencarian (discovery) variabel. IKUTI ATURAN BERIKUT:\n" .
+            "1. **Pencarian Paralel (`Promise.all`)**: SELALU jalankan kueri keyword pencarian (seperti \"kemiskinan\" dan \"miskin\") secara paralel menggunakan `Promise.all` dalam satu langkah `execute_js`. JANGAN pernah menunggu hasil satu keyword secara berurutan (sekuensial).\n" .
+            "2. **Anti-Bruteforce**: DILARANG keras melakukan paginasi variabel (`page: 1` sampai selesai) untuk mencari indikator. Hanya gunakan kueri dengan parameter `keyword` (contoh: `{ model: \"var\", domain: \"{$domainCode}\", keyword: \"kemiskinan\" }`). DILARANG menggunakan parameter `key` karena itu adalah API Key internal BPS.\n" .
+            "3. **Fallback Cepat Provinsi**: Jika seluruh kueri keyword paralel mengembalikan kosong di domain lokal, LANGSUNG ulangi pencarian paralel yang sama di domain provinsi induk (kode domain 2 digit awal + '00').\n" .
+            "4. **Batas Maksimum 2 Round Trips**: Proses discovery harus dibatasi maksimal 2 round trips (Round 1: lokal paralel, Round 2: provinsi paralel). Jika data tetap kosong, laporkan bahwa data tidak tersedia. JANGAN berspekulasi mencari keyword lain secara serial atau terus melakukan query.\n" .
+            "\n💡 Contoh Kode Pencarian Paralel (COPY-PASTE INI LANGSUNG):\n" .
+            "```javascript\n" .
+            "const [resKemiskinan, resMiskin] = await Promise.all([\n" .
+            "  bps.bpsFetch(\"/list\", { model: \"var\", domain: \"{$domainCode}\", keyword: \"kemiskinan\" }),\n" .
+            "  bps.bpsFetch(\"/list\", { model: \"var\", domain: \"{$domainCode}\", keyword: \"miskin\" })\n" .
+            "]);\n" .
+            "return { resKemiskinan, resMiskin };\n" .
+            "```\n";
+
         $map = $this->getMapForDomain($domainCode);
 
         if (empty($map)) {
-            return '';
+            return $discoveryAddendum;
         }
 
         $lines = [];
@@ -129,6 +144,8 @@ class BpsIndicatorMapService
         if ($example) {
             $addendum .= "\n\n### 💡 Contoh Kode Siap Pakai (COPY-PASTE INI LANGSUNG):\n```javascript\n{$example}\n```";
         }
+
+        $addendum .= $discoveryAddendum;
 
         return $addendum;
     }

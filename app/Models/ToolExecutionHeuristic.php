@@ -23,6 +23,7 @@ class ToolExecutionHeuristic extends Model
         'failure_count',
         'validation_count',
         'is_active',
+        'is_system',
         'last_validated_at',
     ];
 
@@ -35,6 +36,7 @@ class ToolExecutionHeuristic extends Model
         'parameter_pattern' => 'array',
         'rewrite_instruction' => 'array',
         'is_active' => 'boolean',
+        'is_system' => 'boolean',
         'last_validated_at' => 'datetime',
     ];
 
