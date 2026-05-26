@@ -533,7 +533,10 @@ class TestBpsAgent extends Command
                 $hasApiCalls = true;
                 $domainUsed = (string)($args['domain_code'] ?? $args['regency_code'] ?? $args['domain'] ?? '');
                 
-                if ($expectedCode && !empty($domainUsed) && str_contains($domainUsed, $expectedCode)) {
+                $expectedBpsCode = $expectedCode ? \App\Services\BpsIndicatorMapService::resolveBpsDomainCode($expectedCode) : '';
+                if ($expectedCode && !empty($domainUsed) && 
+                    (str_contains($domainUsed, $expectedCode) || str_contains($domainUsed, $expectedBpsCode))
+                ) {
                     $hasDomainMatch = true;
                 }
             }

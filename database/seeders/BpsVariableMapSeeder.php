@@ -62,9 +62,12 @@ class BpsVariableMapSeeder extends Seeder
         }
 
         // ─────────────────────────────────────────────────────────────────────
-        // DOMAIN 3101, 3171 - 3175 — DKI Jakarta Administrative Regions
+        // DOMAIN 3101, 3171 - 3175 — DKI Jakarta BPS API Domain Codes
         // pre-loaded route mappings to domain 3100 (DKI Jakarta) with verified vervar_ids.
+        // Clean up any old administrative-keyed records first.
         // ─────────────────────────────────────────────────────────────────────
+        BpsVariableMap::whereIn('domain_code', ['3101', '3171', '3172', '3173', '3174', '3175'])->delete();
+
         $dkiRegions = [
             '3101' => [
                 'name' => 'Kepulauan Seribu',
@@ -72,31 +75,31 @@ class BpsVariableMapSeeder extends Seeder
                 'poverty_vervar' => 1,
                 'tpt_vervar' => 3101,
             ],
-            '3171' => [
+            '3173' => [
                 'name' => 'Kota Jakarta Pusat',
                 'ipm_vervar' => 5,
                 'poverty_vervar' => 4,
                 'tpt_vervar' => 3173,
             ],
-            '3172' => [
+            '3175' => [
                 'name' => 'Kota Jakarta Utara',
                 'ipm_vervar' => 7,
                 'poverty_vervar' => 6,
                 'tpt_vervar' => 3175,
             ],
-            '3173' => [
+            '3174' => [
                 'name' => 'Kota Jakarta Barat',
                 'ipm_vervar' => 6,
                 'poverty_vervar' => 5,
                 'tpt_vervar' => 3174,
             ],
-            '3174' => [
+            '3171' => [
                 'name' => 'Kota Jakarta Selatan',
                 'ipm_vervar' => 3,
                 'poverty_vervar' => 2,
                 'tpt_vervar' => 3171,
             ],
-            '3175' => [
+            '3172' => [
                 'name' => 'Kota Jakarta Timur',
                 'ipm_vervar' => 4,
                 'poverty_vervar' => 3,
